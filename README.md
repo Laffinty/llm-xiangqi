@@ -1,6 +1,6 @@
 # LLM 中国象棋对战程序 (LLM Xiangqi Arena)
 
-基于大语言模型的 Chinese Chess (Xiangqi) 对战程序，支持多种 LLM Provider。
+基于大语言模型的中国象棋对战程序，支持多种 LLM Provider。
 
 ## 功能特性
 
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 ### 3. 运行演示
 
 ```bash
-python main.py --mode demo
+python main.py
 ```
 
 ## 配置说明
