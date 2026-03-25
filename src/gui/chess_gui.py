@@ -31,7 +31,12 @@ INITIAL_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR"
 class ChessGUI:
     """中国象棋3D图形界面"""
 
-    def __init__(self, fen: str = INITIAL_FEN, red_agent_name: str = "红方AI", black_agent_name: str = "黑方AI"):
+    def __init__(
+        self,
+        fen: str = INITIAL_FEN,
+        red_agent_name: str = "红方AI",
+        black_agent_name: str = "黑方AI",
+    ):
         self.fen = fen
         self.batch = pyglet.graphics.Batch()
 
@@ -51,6 +56,9 @@ class ChessGUI:
         self.window: Optional[pyglet.window.Window] = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
+
+        # 线程锁，保护共享状态
+        self._lock = threading.Lock()
 
     def _parse_fen(self, fen: str):
         """解析FEN格式的棋盘状态"""
@@ -72,7 +80,11 @@ class ChessGUI:
                     col_idx += 1
 
     def _iccs_to_coords(self, iccs_move: str) -> tuple:
-        """将ICCS坐标转换为棋盘坐标"""
+        """将ICCS坐标转换为棋盘坐标
+
+        ICCS坐标系：a1是黑方底角（数组z=0），i10是红方顶角（数组z=9）
+        ICCS行号1-10 对应 棋盘数组索引0-9
+        """
         if len(iccs_move) != 4:
             return None
 
@@ -90,22 +102,21 @@ class ChessGUI:
         fen: Optional[str] = None,
         is_game_over: bool = False,
     ):
-        """更新棋盘状态"""
-        if fen:
-            self._parse_fen(fen)
+        """更新棋盘状态（线程安全）"""
+        with self._lock:
+            if fen:
+                self._parse_fen(fen)
 
-        if move and fen:
-            coords = self._iccs_to_coords(move)
-            if coords:
-                from_pos, to_pos = coords
-                moving_char = self.pieces.get(from_pos)
+            if move and fen:
+                coords = self._iccs_to_coords(move)
+                if coords:
+                    from_pos, to_pos = coords
+                    moving_char = self.pieces.get(from_pos)
 
-                if moving_char:
-                    captured = self.pieces.get(to_pos)
+                    if moving_char:
+                        captured = self.pieces.get(to_pos)
 
-                    del self.pieces[from_pos]
-
-                    if captured:
+                        # 只设置动画状态，在主线程update_animation中完成实际移动
                         self.animating_piece = {
                             "from": from_pos,
                             "to": to_pos,
@@ -113,22 +124,10 @@ class ChessGUI:
                             "captured": captured,
                             "progress": 0,
                         }
-                    else:
-                        self.animating_piece = {
-                            "from": from_pos,
-                            "to": to_pos,
-                            "char": moving_char,
-                            "captured": None,
-                            "progress": 0,
-                        }
 
-                    def finish_animation():
-                        time.sleep(self.animation_duration)
-                        self.pieces[to_pos] = moving_char
-                        self.animating_piece = None
-
-                    anim_thread = threading.Thread(target=finish_animation, daemon=True)
-                    anim_thread.start()
+                        # 从原位置移除棋子
+                        if from_pos in self.pieces:
+                            del self.pieces[from_pos]
 
     def capture_piece(self, x, z):
         """移除指定位置的棋子（吃子动画）"""
@@ -182,50 +181,50 @@ class ChessGUI:
         # 绘制红方AI名称阴影（右上角）
         shadow_label = pyglet.text.Label(
             self.red_agent_name,
-            font_name='Microsoft YaHei',
+            font_name="Microsoft YaHei",
             font_size=16,
             color=(0, 0, 0, 255),
             x=self.window.width - 9,
             y=self.window.height - 19,
-            anchor_x='right',
-            anchor_y='top'
+            anchor_x="right",
+            anchor_y="top",
         )
         shadow_label.draw()
 
         red_label = pyglet.text.Label(
             self.red_agent_name,
-            font_name='Microsoft YaHei',
+            font_name="Microsoft YaHei",
             font_size=16,
             color=(220, 40, 40, 255),
             x=self.window.width - 10,
             y=self.window.height - 20,
-            anchor_x='right',
-            anchor_y='top'
+            anchor_x="right",
+            anchor_y="top",
         )
         red_label.draw()
 
         # 绘制黑方AI名称阴影
         shadow_label2 = pyglet.text.Label(
             self.black_agent_name,
-            font_name='Microsoft YaHei',
+            font_name="Microsoft YaHei",
             font_size=16,
             color=(0, 0, 0, 255),
             x=self.window.width - 9,
             y=self.window.height - 44,
-            anchor_x='right',
-            anchor_y='top'
+            anchor_x="right",
+            anchor_y="top",
         )
         shadow_label2.draw()
 
         black_label = pyglet.text.Label(
             self.black_agent_name,
-            font_name='Microsoft YaHei',
+            font_name="Microsoft YaHei",
             font_size=16,
             color=(255, 255, 255, 255),
             x=self.window.width - 10,
             y=self.window.height - 45,
-            anchor_x='right',
-            anchor_y='top'
+            anchor_x="right",
+            anchor_y="top",
         )
         black_label.draw()
 
@@ -253,9 +252,15 @@ class ChessGUI:
 
         eye, target, up = self.camera.get_view_matrix()
         glu.gluLookAt(
-            eye[0], eye[1], eye[2],
-            target[0], target[1], target[2],
-            up[0], up[1], up[2],
+            eye[0],
+            eye[1],
+            eye[2],
+            target[0],
+            target[1],
+            target[2],
+            up[0],
+            up[1],
+            up[2],
         )
 
         self._setup_lighting()
@@ -284,7 +289,11 @@ class ChessGUI:
         board_y = self.board_renderer.board_thickness
 
         for (x, z), char in list(self.pieces.items()):
-            if anim_from and abs(x - anim_from[0]) < 0.1 and abs(z - anim_from[1]) < 0.1:
+            if (
+                anim_from
+                and abs(x - anim_from[0]) < 0.1
+                and abs(z - anim_from[1]) < 0.1
+            ):
                 continue
             if anim_to and abs(x - anim_to[0]) < 0.1 and abs(z - anim_to[1]) < 0.1:
                 continue
@@ -339,24 +348,29 @@ class ChessGUI:
         self.camera.zoom(scroll_y)
 
     def update_animation(self, dt):
-        """更新动画"""
+        """更新动画（主线程调用，线程安全）"""
         if not self._running or not self.window:
             return
-        if self.animating_piece:
-            self.animating_piece["progress"] += dt / self.animation_duration
-            if self.animating_piece["progress"] >= 1.0:
-                to_x, to_z = self.animating_piece["to"]
-                char = self.animating_piece["char"]
-                self.pieces[(to_x, to_z)] = char
 
-                captured = self.animating_piece.get("captured")
-                if captured:
-                    cap_x, cap_z = self.animating_piece["to"]
-                    cap_key = (cap_x, cap_z)
-                    if cap_key in self.pieces:
-                        del self.pieces[cap_key]
+        with self._lock:
+            if self.animating_piece:
+                self.animating_piece["progress"] += dt / self.animation_duration
+                if self.animating_piece["progress"] >= 1.0:
+                    to_x, to_z = self.animating_piece["to"]
+                    char = self.animating_piece["char"]
+                    captured = self.animating_piece.get("captured")
 
-                self.animating_piece = None
+                    # 放置移动的棋子到目标位置
+                    self.pieces[(to_x, to_z)] = char
+
+                    # 删除被吃的棋子
+                    if captured:
+                        cap_x, cap_z = self.animating_piece["to"]
+                        cap_key = (cap_x, cap_z)
+                        if cap_key in self.pieces:
+                            del self.pieces[cap_key]
+
+                    self.animating_piece = None
 
     def run(self):
         """运行GUI（主循环）"""
