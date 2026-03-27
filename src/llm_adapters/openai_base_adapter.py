@@ -1,7 +1,11 @@
 """
-GLM LLM适配器
+OpenAI 兼容协议适配器基类
 
-支持智谱AI GLM系列（OpenAI兼容）
+提取 DeepSeek、MiMo 等 OpenAI 兼容适配器的公共逻辑：
+- AsyncOpenAI 客户端创建
+- chat() 参数构建 + 指数退避重试 + TimeoutError 处理
+- 响应解析（tool_calls + reasoning_content → thought 映射）
+- 资源释放
 """
 
 import json
@@ -13,22 +17,19 @@ from openai import AsyncOpenAI
 from .base_adapter import BaseLLMAdapter, LLMResponse
 
 
-class GLMAdapter(BaseLLMAdapter):
-    """GLM LLM适配器
+class OpenAICompatibleAdapter(BaseLLMAdapter):
+    """OpenAI 兼容协议适配器基类
 
-    API格式:
-    - Base URL: https://open.bigmodel.cn/api/paas/v4
-    - 模型: glm-5, glm-5-turbo, glm-4v, etc.
-    - 协议: OpenAI兼容
-    - GLM-5支持thinking模式: {"type": "enabled"}
+    适用于所有使用 OpenAI Chat Completions API 格式的 LLM 服务。
+    子类只需覆盖 __init__ 中的默认 model 和 base_url。
     """
 
     def __init__(
         self,
         api_key: str,
-        model: str = "glm-5",
-        base_url: str = "https://open.bigmodel.cn/api/paas/v4",
-        timeout: int = 60,
+        model: str,
+        base_url: str,
+        timeout: int = 30,
         max_retries: int = 3,
         temperature: float = 0.7,
         max_tokens: int = 2048
@@ -55,7 +56,7 @@ class GLMAdapter(BaseLLMAdapter):
         tools: Optional[List[Dict]] = None,
         **kwargs
     ) -> LLMResponse:
-        """发送聊天请求（支持Function Calling）"""
+        """发送聊天请求（支持 Function Calling）"""
 
         params = {
             "model": self.model,
@@ -68,14 +69,13 @@ class GLMAdapter(BaseLLMAdapter):
             params["tools"] = tools
             params["tool_choice"] = kwargs.get("tool_choice", "auto")
 
-        # 重试逻辑（带超时保护）
         last_error = None
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.chat.completions.create(**params)
                 return self._parse_response(response)
             except asyncio.TimeoutError:
-                last_error = Exception(f"GLM API timeout after {self.timeout}s")
+                last_error = Exception(f"{self.model} API timeout after {self.timeout}s")
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
             except Exception as e:
@@ -83,13 +83,13 @@ class GLMAdapter(BaseLLMAdapter):
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
 
-        raise last_error or Exception("GLM API call failed")
+        raise last_error or Exception(f"{self.model} API call failed")
 
     def _parse_response(self, response) -> LLMResponse:
-        """解析GLM响应"""
+        """解析 OpenAI 兼容响应，统一映射到 LLMResponse"""
         choice = response.choices[0]
 
-        # 提取tool_calls
+        # 提取 tool_calls
         tool_calls = None
         if choice.finish_reason == "tool_calls" or choice.message.tool_calls:
             tool_calls = []
@@ -103,7 +103,7 @@ class GLMAdapter(BaseLLMAdapter):
                     "arguments": args
                 })
 
-        # GLM可能返回 reasoning_content (思考过程)
+        # 提取 thought（reasoning_content），适用于 GLM、MiMo 等推理模型
         thought = None
         if hasattr(choice.message, 'reasoning_content') and choice.message.reasoning_content:
             thought = choice.message.reasoning_content

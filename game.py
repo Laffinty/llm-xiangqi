@@ -24,116 +24,80 @@ from pathlib import Path
 from src.core.referee_engine import RefereeEngine, INITIAL_FEN
 from src.core.game_controller import LLMAgentGameController
 from src.gui.chess_gui import ChessGUI
-from src.agents.agent_deepseek import DeepSeekAgent
-from src.agents.agent_minimax import MiniMaxAgent
-from src.agents.agent_glm import GLMAgent
+from src.agents.llm_agent import LLMAgent
 from src.agents.base_agent import AgentConfig
 from src.agents.prompt_builder import PromptBuilder
+from src.llm_adapters.base_adapter import BaseLLMAdapter
 from src.llm_adapters.deepseek_adapter import DeepSeekAdapter
-from src.llm_adapters.minimax_adapter import MiniMaxAdapter
-from src.llm_adapters.glm_adapter import GLMAdapter
 from src.llm_adapters.mimo_adapter import MiMoAdapter
+from src.llm_adapters.minimax_adapter import MiniMaxAdapter
 from src.utils.config_loader import ConfigLoader
 from src.utils.logger import get_logger
 
 
+ADAPTER_MAP = {
+    "deepseek": DeepSeekAdapter,
+    "mimo": MiMoAdapter,
+    "minimax": MiniMaxAdapter,
+}
+
+
 logger = get_logger("game", level="INFO")
+
+
+def _create_adapter(llm_config: dict) -> BaseLLMAdapter:
+    """根据配置创建 LLM 适配器"""
+    provider = llm_config["provider"]
+    adapter_cls = ADAPTER_MAP.get(provider)
+    if not adapter_cls:
+        raise ValueError(
+            f"Unknown LLM provider: '{provider}'. "
+            f"Supported: {list(ADAPTER_MAP.keys())}"
+        )
+    return adapter_cls(
+        api_key=llm_config["api_key"],
+        model=llm_config["model"],
+        base_url=llm_config["base_url"],
+        timeout=llm_config.get("timeout", 30),
+        max_retries=llm_config.get("max_retries", 3),
+        temperature=llm_config.get("temperature", 0.7),
+        max_tokens=llm_config.get("max_tokens", 2048),
+    )
+
+
+def _load_agent(config_file: str) -> LLMAgent:
+    """从配置文件加载单个 Agent"""
+    cfg = ConfigLoader.load_yaml(Path(__file__).parent / "config" / config_file)
+    llm_config = cfg["llm"]
+    agent_data = cfg["agent"]
+
+    adapter = _create_adapter(llm_config)
+
+    prompt_path = Path(__file__).parent / agent_data.get(
+        "system_prompt_file", "prompts/agent_default.txt"
+    )
+    system_prompt = PromptBuilder.from_file(str(prompt_path)).system_prompt
+
+    agent_cfg = AgentConfig(
+        name=agent_data["name"],
+        color=agent_data["color"],
+        description=agent_data.get("description", ""),
+        llm_adapter=adapter,
+        system_prompt=system_prompt,
+        max_retries=agent_data.get("max_retries", 3),
+        use_tools=agent_data.get("use_tools", False),
+        use_reflection=agent_data.get("use_reflection", False),
+    )
+
+    return LLMAgent(agent_cfg)
 
 
 def load_agents():
     """加载Agent配置"""
     logger.info("Loading agent configurations...")
 
-    agent1_config = ConfigLoader.load_yaml(
-        Path(__file__).parent / "config" / "agent1_config.yaml"
-    )
-    llm1_config = agent1_config["llm"]
-    agent1_data = agent1_config["agent"]
-
-    deepseek_adapter = DeepSeekAdapter(
-        api_key=llm1_config["api_key"],
-        model=llm1_config["model"],
-        base_url=llm1_config["base_url"],
-        timeout=llm1_config.get("timeout", 30),
-        max_retries=llm1_config.get("max_retries", 3),
-        temperature=llm1_config.get("temperature", 0.7),
-        max_tokens=llm1_config.get("max_tokens", 2048),
-    )
-
-    prompt_path = Path(__file__).parent / agent1_data.get(
-        "system_prompt_file", "prompts/agent_default.txt"
-    )
-    agent1_prompt = PromptBuilder.from_file(str(prompt_path)).system_prompt
-
-    agent1_cfg = AgentConfig(
-        name=agent1_data["name"],
-        color=agent1_data["color"],
-        description=agent1_data.get("description", ""),
-        llm_adapter=deepseek_adapter,
-        system_prompt=agent1_prompt,
-        max_retries=agent1_data.get("max_retries", 3),
-        use_tools=agent1_data.get("use_tools", False),
-        use_reflection=agent1_data.get("use_reflection", False),
-    )
-
-    agent2_config = ConfigLoader.load_yaml(
-        Path(__file__).parent / "config" / "agent2_config.yaml"
-    )
-    llm2_config = agent2_config["llm"]
-    agent2_data = agent2_config["agent"]
-
-    provider = llm2_config.get("provider", "glm")
-    if provider == "mimo":
-        llm2_adapter = MiMoAdapter(
-            api_key=llm2_config["api_key"],
-            model=llm2_config["model"],
-            base_url=llm2_config["base_url"],
-            timeout=llm2_config.get("timeout", 60),
-            max_retries=llm2_config.get("max_retries", 3),
-            temperature=llm2_config.get("temperature", 0.7),
-            max_tokens=llm2_config.get("max_tokens", 2048),
-        )
-    elif provider == "glm":
-        llm2_adapter = GLMAdapter(
-            api_key=llm2_config["api_key"],
-            model=llm2_config["model"],
-            base_url=llm2_config["base_url"],
-            timeout=llm2_config.get("timeout", 60),
-            max_retries=llm2_config.get("max_retries", 3),
-            temperature=llm2_config.get("temperature", 0.7),
-            max_tokens=llm2_config.get("max_tokens", 2048),
-        )
-    elif provider == "minimax":
-        llm2_adapter = MiniMaxAdapter(
-            api_key=llm2_config["api_key"],
-            model=llm2_config["model"],
-            base_url=llm2_config["base_url"],
-            timeout=llm2_config.get("timeout", 60),
-            max_retries=llm2_config.get("max_retries", 3),
-            temperature=llm2_config.get("temperature", 0.7),
-            max_tokens=llm2_config.get("max_tokens", 2048),
-        )
-    else:
-        raise ValueError(f"Unsupported provider for Agent2: {provider}")
-
-    prompt_path = Path(__file__).parent / agent2_data.get(
-        "system_prompt_file", "prompts/agent_default.txt"
-    )
-    agent2_prompt = PromptBuilder.from_file(str(prompt_path)).system_prompt
-
-    agent2_cfg = AgentConfig(
-        name=agent2_data["name"],
-        color=agent2_data["color"],
-        description=agent2_data.get("description", ""),
-        llm_adapter=llm2_adapter,
-        system_prompt=agent2_prompt,
-        max_retries=agent2_data.get("max_retries", 3),
-        use_tools=agent2_data.get("use_tools", False),
-        use_reflection=agent2_data.get("use_reflection", False),
-    )
-
-    agent1 = DeepSeekAgent(agent1_cfg)
-    agent2 = GLMAgent(agent2_cfg)
+    agent1 = _load_agent("agent1_config.yaml")
+    agent2 = _load_agent("agent2_config.yaml")
 
     logger.info(f"Agent1 (Red): {agent1.config.name} - {agent1.config.description}")
     logger.info(f"Agent2 (Black): {agent2.config.name} - {agent2.config.description}")

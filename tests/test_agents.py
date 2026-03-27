@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from src.llm_adapters.base_adapter import LLMResponse, BaseLLMAdapter
 from src.llm_adapters.deepseek_adapter import DeepSeekAdapter
-from src.llm_adapters.minimax_adapter import MiniMaxAdapter
 from src.agents.prompt_builder import PromptBuilder, MCP_TOOLS
 from src.agents.base_agent import BaseAgent, AgentConfig, AgentResult, AgentStatus
 from src.core.referee_engine import RefereeEngine
