@@ -44,6 +44,7 @@ class AgentResult:
     move: Optional[str] = None
     thought: Optional[str] = None
     error: Optional[str] = None
+    resign: bool = False  # LLM是否主动投降
     tool_results: List[Dict] = field(default_factory=list)
 
 
@@ -209,6 +210,11 @@ class BaseAgent(ABC):
         import re
         logger = get_logger("agent", level="WARNING")
 
+        # 检测投降指令 jxjx
+        if re.search(r'\bjxjx\b', content, re.IGNORECASE):
+            logger.info("_extract_move: 检测到投降指令 jxjx")
+            return "jxjx"
+
         # 找到所有4字符的ICCS走步（大小写不敏感）
         all_matches = re.findall(r'\b([a-iA-I][0-9][a-iA-I][0-9])\b', content)
 
@@ -260,6 +266,8 @@ class BaseAgent(ABC):
 """
         if legal_moves:
             correction_prompt += f"\n当前合法走步列表：{legal_moves[:20]}{'...' if len(legal_moves) > 20 else ''}"
+
+        correction_prompt += '\n\n如果局面确实无法挽救，你可以输出 {"thought": "认输原因", "move": "jxjx"} 来认输。'
 
         # 添加到历史，LLM下次思考时会看到
         self.prompt_builder.add_to_history("user", correction_prompt)

@@ -13,7 +13,7 @@ RefereeEngine - 中国象棋裁判引擎
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Set
+from typing import List, Tuple, Optional, Set, Dict, Any
 from enum import Enum
 import re
 
@@ -289,6 +289,72 @@ class RefereeEngine:
                         if self._is_move_legal(move, piece):
                             legal_moves.append(move.to_iccs())
         return legal_moves
+
+    def get_annotated_moves(self) -> List[Dict[str, Any]]:
+        """获取带语义标注的合法走步列表
+
+        Returns:
+            [{"move": "h2e2", "annotations": ["capture:Pawn", "check"]}, ...]
+        """
+        annotated = []
+        for r in range(10):
+            for c in range(9):
+                piece = self.board.grid[r][c]
+                if piece and piece.color == self.board.current_color:
+                    pos = Position(c, r)
+                    for target in self._get_piece_moves(pos, piece):
+                        move = Move(pos, target)
+                        if self._is_move_legal(move, piece):
+                            annotations = self._annotate_move(move, piece)
+                            annotated.append({
+                                "move": move.to_iccs(),
+                                "annotations": annotations,
+                            })
+        return annotated
+
+    def _annotate_move(self, move: Move, piece: Piece) -> List[str]:
+        """为单步走步生成语义标注
+
+        检测四类标注：
+        - capture:{piece_type}: 吃子
+        - check: 将军
+        - repetition_warning: 走后局面已出现≥2次
+        - development: 车从底线出发
+        """
+        annotations = []
+
+        # 1. 吃子检测（无需模拟走步）
+        target_piece = self.board.get_piece(move.to_pos)
+        if target_piece and target_piece.color != piece.color:
+            annotations.append(f"capture:{target_piece.piece_type.value}")
+
+        # 2. 出子标记（无需模拟走步）
+        if piece.piece_type == PieceType.ROOK:
+            if (piece.color == Color.RED and move.from_pos.row == 0 and move.to_pos.row > 0) or \
+               (piece.color == Color.BLACK and move.from_pos.row == 9 and move.to_pos.row < 9):
+                annotations.append("development")
+
+        # 3-4. 将军检测和重复警告（需要模拟走步）
+        saved_from = self.board.remove_piece(move.from_pos)
+        saved_to = self.board.get_piece(move.to_pos)
+        self.board.set_piece(move.to_pos, piece)
+
+        # 将军检测：走步后对方王是否被将军
+        if self.is_king_in_check(piece.color.opposite()):
+            annotations.append("check")
+
+        # 重复警告：模拟走后局面在 history 中已出现≥2次
+        # 将军时不标重复警告，避免误导 LLM 避免唯一正确的将军走步
+        temp_fen = self.to_fen()
+        if self.position_history.count(temp_fen) >= 2:
+            if "check" not in annotations:
+                annotations.append("repetition_warning")
+
+        # 恢复棋盘状态
+        self.board.set_piece(move.from_pos, saved_from)
+        self.board.set_piece(move.to_pos, saved_to)
+
+        return annotations
 
     def _get_piece_moves(self, pos: Position, piece: Piece) -> List[Position]:
         """获取指定棋子的所有移动目标（不考虑将军检查）"""

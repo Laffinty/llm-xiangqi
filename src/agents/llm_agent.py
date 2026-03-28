@@ -44,6 +44,20 @@ class LLMAgent(BaseAgent):
                 response.content,
                 legal_moves=game_state.get('legal_moves', [])
             )
+            # 如果content为空，尝试从reasoning_content中提取走步
+            if move is None and response.thought:
+                move = self._extract_move(
+                    response.thought,
+                    legal_moves=game_state.get('legal_moves', [])
+                )
+            # 投降指令
+            if move == "jxjx":
+                return AgentResult(
+                    success=True,
+                    move="jxjx",
+                    thought=response.thought or (response.content[:500] if response.content else ""),
+                    resign=True,
+                )
             return AgentResult(
                 success=True,
                 move=move,

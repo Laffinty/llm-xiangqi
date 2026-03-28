@@ -37,6 +37,7 @@ class GameState:
     legal_moves: List[str]
     legal_moves_count: int
     game_history: List[str] = field(default_factory=list)
+    annotated_moves: List[Dict[str, Any]] = field(default_factory=list)
     last_move: Optional[str] = None
     last_move_by: Optional[str] = None
     phase: GamePhase = GamePhase.NOT_STARTED
@@ -52,6 +53,7 @@ class GameState:
             "legal_moves": self.legal_moves,
             "legal_moves_count": self.legal_moves_count,
             "game_history": self.game_history,
+            "annotated_moves": self.annotated_moves,
             "last_move": self.last_move,
             "last_move_by": self.last_move_by,
             "phase": self.phase.value,
@@ -62,13 +64,15 @@ class GameState:
     @classmethod
     def from_engine(cls, engine) -> "GameState":
         """从RefereeEngine创建GameState"""
+        annotated_moves = engine.get_annotated_moves()
         return cls(
             turn=engine.get_current_turn(),
             fen=engine.current_fen,
             ascii_board=engine.render_ascii_board(),
-            legal_moves=engine.get_legal_moves(),
-            legal_moves_count=len(engine.get_legal_moves()),
-            game_history=engine.move_history.copy()
+            legal_moves=[m["move"] for m in annotated_moves],
+            legal_moves_count=len(annotated_moves),
+            game_history=engine.move_history.copy(),
+            annotated_moves=annotated_moves,
         )
 
 

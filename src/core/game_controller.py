@@ -85,11 +85,7 @@ class GameController:
             is_over, reason = self.referee.check_game_end()
             if is_over:
                 self.phase = GamePhase.GAME_OVER
-                self.result = (
-                    GameResult.RED_WIN
-                    if self.referee.board.current_color == Color.BLACK
-                    else GameResult.BLACK_WIN
-                )
+                self.result = self._map_reason_to_result(reason)
                 self.result_reason = reason
             else:
                 if self.phase == GamePhase.RED_TO_MOVE:
@@ -101,6 +97,31 @@ class GameController:
 
         except Exception as e:
             return MoveResult(success=False, error=str(e))
+
+    @staticmethod
+    def _map_reason_to_result(reason: str) -> GameResult:
+        """将游戏结束原因字符串映射到GameResult枚举值
+
+        Args:
+            reason: check_game_end()返回的原因字符串
+
+        Returns:
+            对应的GameResult枚举值
+        """
+        if "判和" in reason:
+            return GameResult.DRAW
+        if reason.startswith("红方长将"):
+            return GameResult.BLACK_WIN
+        if reason.startswith("黑方长将"):
+            return GameResult.RED_WIN
+        if reason.startswith("红方胜利"):
+            return GameResult.RED_WIN
+        if reason.startswith("黑方胜利"):
+            return GameResult.BLACK_WIN
+        # Fallback: heuristic based on current turner losing
+        from .referee_engine import Color
+        # Should not normally reach here; kept for forward-compatibility
+        return GameResult.RED_WIN  # pragma: no cover
 
     def _validate_iccs_format(self, move: str) -> bool:
         """验证ICCS走步格式"""
@@ -158,6 +179,19 @@ class LLMAgentGameController(GameController):
         self.black_agent = black_agent
         self.current_agent = None
         self._observers: list = []
+
+    def _count_non_king_pieces(self, color: str) -> int:
+        """计算指定颜色的非将/帅棋子数量"""
+        from .referee_engine import PieceType, Color
+
+        c = Color(color.lower())
+        count = 0
+        for r in range(10):
+            for col in range(9):
+                piece = self.referee.board.grid[r][col]
+                if piece and piece.color == c and piece.piece_type != PieceType.KING:
+                    count += 1
+        return count
 
     def register_observer(self, callback):
         """注册观察者
@@ -223,6 +257,33 @@ class LLMAgentGameController(GameController):
             if not result.success:
                 return MoveResult(success=False, error=result.error)
 
+            # 投降检测
+            if result.resign or result.move == "jxjx":
+                from ..utils.logger import get_logger
+
+                logger = get_logger("game", level="INFO")
+                agent_name = self.current_agent.config.name
+
+                # 投降门槛：非将棋子 >= 3 时拒绝投降
+                resigner_color = self.current_agent.config.color
+                non_king = self._count_non_king_pieces(resigner_color)
+                if non_king >= 3:
+                    logger.warning(
+                        f"{agent_name} 子力充足({non_king}个非将棋子)尝试投降，拒绝并继续纠错"
+                    )
+                    last_error_msg = "你的子力仍然充足，不允许投降。请从合法走步中选择一个。"
+                    continue
+
+                logger.info(f"{agent_name} 投降认输，原因: {result.thought}")
+                if self.phase == GamePhase.RED_TO_MOVE:
+                    self.result = GameResult.BLACK_WIN
+                    self.result_reason = f"Red resigned: {result.thought}"
+                else:
+                    self.result = GameResult.RED_WIN
+                    self.result_reason = f"Black resigned: {result.thought}"
+                self.phase = GamePhase.GAME_OVER
+                return MoveResult(success=True, error=None, thought=f"投降认输: {result.thought}")
+
             if result.move and result.move in legal_moves:
                 move_result = self.apply_move(
                     self.current_agent.config.name, result.move
@@ -242,8 +303,6 @@ class LLMAgentGameController(GameController):
                     logger.warning(
                         f"LLM幻觉非法走步: {result.move}, attempt {attempt + 1}/3"
                     )
-
-                self.current_agent.reset()
 
         return MoveResult(success=False, error=f"LLM连续3次产生非法走步，已放弃")
 

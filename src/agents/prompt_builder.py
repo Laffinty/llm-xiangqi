@@ -68,9 +68,33 @@ class PromptBuilder:
 
         return self.build_messages(system_prompt, user_content)
 
+    # 棋子类型中文名映射
+    _PIECE_TYPE_CN = {
+        "King": "将",
+        "Advisor": "仕",
+        "Bishop": "相",
+        "Knight": "马",
+        "Rook": "车",
+        "Cannon": "炮",
+        "Pawn": "兵",
+    }
+
+    def _format_annotation(self, ann: str) -> str:
+        """将英文标注转换为中文短标签"""
+        if ann.startswith("capture:"):
+            piece_type = ann.split(":", 1)[1]
+            return f"吃{self._PIECE_TYPE_CN.get(piece_type, piece_type)}"
+        if ann == "check":
+            return "将军"
+        if ann == "repetition_warning":
+            return "重复!"
+        if ann == "development":
+            return "出车"
+        return ann
+
     def _format_game_state(self, state: Dict[str, Any]) -> str:
         """格式化游戏状态"""
-        legal_moves = state.get("legal_moves", [])
+        annotated_moves = state.get("annotated_moves", [])
 
         lines = [
             "# 当前局面",
@@ -82,17 +106,69 @@ class PromptBuilder:
             "## ASCII棋盘",
             state.get("ascii_board", ""),
             "",
-            "## 合法走步",
-            f"共 {len(legal_moves)} 种走法:",
         ]
 
-        if legal_moves:
-            for i in range(0, len(legal_moves), 10):
-                lines.append(", ".join(legal_moves[i : i + 10]))
+        if annotated_moves:
+            lines.append(f"## 合法走步 (共 {len(annotated_moves)} 种)")
+
+            # 按标注类型分组
+            check_capture = []
+            development = []
+            repetition = []
+            other = []
+
+            for entry in annotated_moves:
+                move_str = entry["move"]
+                anns = entry.get("annotations", [])
+                if not anns:
+                    other.append(move_str)
+                elif "repetition_warning" in anns:
+                    # 重复警告单独分组
+                    label_parts = [self._format_annotation(a) for a in anns]
+                    repetition.append(f"{move_str} ({', '.join(label_parts)})")
+                elif "development" in anns and all(
+                    a == "development" for a in anns
+                ):
+                    development.append(f"{move_str} (出车)")
+                else:
+                    # 将军/吃子组
+                    label_parts = [self._format_annotation(a) for a in anns]
+                    check_capture.append(
+                        f"{move_str} ({', '.join(label_parts)})"
+                    )
+
+            if check_capture:
+                lines.append("")
+                lines.append("### 将军/吃子")
+                lines.append(", ".join(check_capture))
+
+            if development:
+                lines.append("")
+                lines.append("### 出子")
+                lines.append(", ".join(development))
+
+            if repetition:
+                lines.append("")
+                lines.append("### 重复警告")
+                lines.append(", ".join(repetition))
+
+            if other:
+                lines.append("")
+                lines.append("### 其他")
+                for i in range(0, len(other), 10):
+                    lines.append(", ".join(other[i : i + 10]))
+        else:
+            # 回退到无标注格式
+            legal_moves = state.get("legal_moves", [])
+            lines.append("## 合法走步")
+            lines.append(f"共 {len(legal_moves)} 种走法:")
+            if legal_moves:
+                for i in range(0, len(legal_moves), 10):
+                    lines.append(", ".join(legal_moves[i : i + 10]))
 
         if state.get("last_move"):
             lines.append("")
-            lines.append(f"## 上一步走步")
+            lines.append("## 上一步走步")
             lines.append(
                 f"{state.get('last_move')} by {state.get('last_move_by', 'Unknown')}"
             )
