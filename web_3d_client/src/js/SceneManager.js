@@ -391,47 +391,41 @@ export class SceneManager {
    * 创建九宫格斜线
    * 
    * 标准规范：
-   * - 红方九宫：row 0-2, col 3-5（底线起3行，中间3列 d-e-f），棋盘下方（z > 0）
-   * - 黑方九宫：row 7-9, col 3-5（底线起3行，中间3列 d-e-f），棋盘上方（z < 0）
+   * - 红方九宫：row 0-2, col 3-5（底线起3行，中间3列 d-e-f），棋盘下方（z < 0）
+   * - 黑方九宫：row 7-9, col 3-5（底线起3行，中间3列 d-e-f），棋盘上方（z > 0）
    * 
-   * 坐标系：row 0 -> z = +4.5（靠近用户，红方底线）
-   *        row 9 -> z = -4.5（远离用户，黑方底线）
+   * 坐标系：row 0 -> z = -4.5（靠近用户，红方底线）
+   *        row 9 -> z = +4.5（远离用户，黑方底线）
    */
   _createPalaceLines(halfWidth, halfHeight, cellSize, material) {
-    // 列索引：3=d, 4=e, 5=f
-    const leftCol = -halfWidth + 3 * cellSize   // d 列
-    const midCol = -halfWidth + 4 * cellSize    // e 列（中间）
-    const rightCol = -halfWidth + 5 * cellSize  // f 列
+    const leftCol = -halfWidth + 3 * cellSize
+    const midCol = -halfWidth + 4 * cellSize
+    const rightCol = -halfWidth + 5 * cellSize
     
     // 红方九宫（棋盘下方，row 0-2，z > 0）
-    // row 0 -> z = +4.5, row 2 -> z = +2.5
-    const redTopZ = halfHeight - 2 * cellSize   // row 2
-    const redBottomZ = halfHeight               // row 0（靠近用户）
+    // 使用与 _iccsToWorld 相同的坐标映射：z = (4.5 - row) * cellSize
+    const redTopZ = (4.5 - 2) * cellSize     // row 2（靠近河界侧，z = 2.5）
+    const redBottomZ = (4.5 - 0) * cellSize  // row 0（红方底线，z = 4.5）
     
-    // 红方九宫四角
     const redTopLeft = new THREE.Vector3(leftCol, 0.005, redTopZ)
     const redTopRight = new THREE.Vector3(rightCol, 0.005, redTopZ)
     const redBottomLeft = new THREE.Vector3(leftCol, 0.005, redBottomZ)
     const redBottomRight = new THREE.Vector3(rightCol, 0.005, redBottomZ)
     
-    // 红方对角线（连接四角）
     const diag3 = new THREE.BufferGeometry().setFromPoints([redTopLeft, redBottomRight])
     const diag4 = new THREE.BufferGeometry().setFromPoints([redTopRight, redBottomLeft])
     this.boardGroup.add(new THREE.Line(diag3, material))
     this.boardGroup.add(new THREE.Line(diag4, material))
     
     // 黑方九宫（棋盘上方，row 7-9，z < 0）
-    // row 7 -> z = -2.5, row 9 -> z = -4.5
-    const blackTopZ = -halfHeight + 7 * cellSize  // row 7
-    const blackBottomZ = -halfHeight              // row 9（远离用户）
+    const blackTopZ = (4.5 - 7) * cellSize     // row 7（靠近河界侧，z = -2.5）
+    const blackBottomZ = (4.5 - 9) * cellSize  // row 9（黑方底线，z = -4.5）
     
-    // 黑方九宫四角
     const blackTopLeft = new THREE.Vector3(leftCol, 0.005, blackTopZ)
     const blackTopRight = new THREE.Vector3(rightCol, 0.005, blackTopZ)
     const blackBottomLeft = new THREE.Vector3(leftCol, 0.005, blackBottomZ)
     const blackBottomRight = new THREE.Vector3(rightCol, 0.005, blackBottomZ)
     
-    // 黑方对角线（连接四角）
     const diag1 = new THREE.BufferGeometry().setFromPoints([blackTopLeft, blackBottomRight])
     const diag2 = new THREE.BufferGeometry().setFromPoints([blackTopRight, blackBottomLeft])
     this.boardGroup.add(new THREE.Line(diag1, material))
