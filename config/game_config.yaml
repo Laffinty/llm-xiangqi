@@ -19,3 +19,20 @@ logging:
   level: "INFO"
   file: "logs/game.log"
   console: true
+
+gui:
+  3d: false
+  web_3d: true
+
+  # Web 3D 服务器配置
+  web_3d_config:
+    host: "0.0.0.0"               # 绑定地址
+    port: 8080                    # 服务端口
+    auto_open_browser: true       # 自动打开浏览器
+    static_dir: "src/web_3d/static"  # 静态文件目录
+
+    # 渲染配置
+    rendering:
+      shadow_map_size: 2048
+      default_camera_position: [8, 12, 12]
+      animation_duration: 0.5    # 秒

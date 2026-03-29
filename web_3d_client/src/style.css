@@ -1,0 +1,521 @@
+/**
+ * Web 3D 中国象棋 - 样式表
+ */
+
+/* 重置 */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 基础 */
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #0f0f1a;
+  color: #fff;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部 */
+header {
+  height: 60px;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 1px solid #2a2a3e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #e0e0ff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+header h1::before {
+  content: '♟️';
+  font-size: 1.4rem;
+}
+
+/* 渲染器信息 */
+.renderer-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.renderer-badge.webgpu {
+  background: #4caf50;
+  color: #fff;
+}
+
+.renderer-badge.webgl2 {
+  background: #2196f3;
+  color: #fff;
+}
+
+/* 主体 */
+main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 游戏区域 */
+#game-container {
+  flex: 1;
+  position: relative;
+  background: #0a0a14;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+/* 侧边栏 */
+aside {
+  width: 320px;
+  background: #141428;
+  border-left: 1px solid #2a2a3e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 连接状态 */
+.connection-status {
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a3e;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-label {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: #4caf50;
+  color: #fff;
+}
+
+.status-badge.disconnected {
+  background: #757575;
+  color: #fff;
+}
+
+.status-badge.reconnecting {
+  background: #ff9800;
+  color: #000;
+  animation: pulse 1s infinite;
+}
+
+.status-badge.failed {
+  background: #f44336;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 回合信息 */
+.turn-info {
+  padding: 16px;
+  background: #1a1a32;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+#turn-info {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #e0e0ff;
+}
+
+/* 玩家信息 */
+.players-section {
+  padding: 16px;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+.players-section h3 {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.player-card {
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.player-card:last-child {
+  margin-bottom: 0;
+}
+
+.player-card.red {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.player-card.red.active {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: #f44336;
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
+}
+
+.player-card.black {
+  background: rgba(33, 33, 33, 0.5);
+  border-color: rgba(100, 100, 100, 0.3);
+}
+
+.player-card.black.active {
+  background: rgba(100, 100, 100, 0.3);
+  border-color: #888;
+  box-shadow: 0 0 10px rgba(136, 136, 136, 0.3);
+}
+
+.player-name {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.player-card.red .player-name {
+  color: #ff6b6b;
+}
+
+.player-card.black .player-name {
+  color: #aaa;
+}
+
+.player-model {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* 走步历史 */
+.history-section {
+  flex: 1;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100px;
+}
+
+/* 控制按钮区域 */
+.controls-section {
+  padding: 16px;
+  border-top: 1px solid #2a2a3e;
+  background: #1a1a2e;
+}
+
+.controls-section h3 {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.control-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 12px;
+  background: #2a2a3e;
+  border: 1px solid #3a3a4e;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.control-btn:hover {
+  background: #3a3a4e;
+  border-color: #4a4a5e;
+}
+
+.control-btn:active {
+  transform: scale(0.98);
+}
+
+.control-btn span {
+  font-size: 1rem;
+}
+
+.control-btn.active {
+  background: #4caf50;
+  border-color: #45a049;
+  color: #fff;
+}
+
+.control-btn.muted {
+  background: #f44336;
+  border-color: #da3c3c;
+  color: #fff;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-control label {
+  font-size: 0.8rem;
+  color: #888;
+  min-width: 30px;
+}
+
+.volume-control input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  background: #3a3a4e;
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #4caf50;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.history-section h3 {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.history-content {
+  flex: 1;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #aaa;
+}
+
+.history-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-content::-webkit-scrollbar-track {
+  background: #0f0f1a;
+}
+
+.history-content::-webkit-scrollbar-thumb {
+  background: #3a3a4e;
+  border-radius: 3px;
+}
+
+/* 游戏结果 */
+.game-result {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(20, 20, 40, 0.95);
+  border: 2px solid #4caf50;
+  border-radius: 16px;
+  padding: 32px 48px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.game-result.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.result-title {
+  font-size: 1.2rem;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.result-text {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #4caf50;
+  margin-bottom: 8px;
+}
+
+.result-reason {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+/* 错误提示 */
+#error-message {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f44336;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  z-index: 200;
+  display: none;
+}
+
+/* 致命错误 */
+.fatal-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a2e;
+  border: 2px solid #f44336;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  max-width: 400px;
+}
+
+.fatal-error h2 {
+  color: #f44336;
+  margin-bottom: 16px;
+}
+
+.fatal-error p {
+  color: #aaa;
+  margin-bottom: 24px;
+}
+
+.fatal-error button {
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.fatal-error button:hover {
+  background: #45a049;
+}
+
+/* 加载动画 */
+.loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 20, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: opacity 0.3s ease;
+  z-index: 50;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #2a2a3e;
+  border-top-color: #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #aaa;
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.loading-subtext {
+  color: #666;
+  font-size: 0.8rem;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  aside {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  main {
+    flex-direction: column;
+  }
+  
+  aside {
+    width: 100%;
+    height: 200px;
+    border-left: none;
+    border-top: 1px solid #2a2a3e;
+  }
+  
+  .history-content {
+    max-height: 100px;
+  }
+}

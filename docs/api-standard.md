@@ -1,9 +1,9 @@
 # LLM-Xiangqi 统一通信 API 标准
 
-> 版本: 0.2.0
-> 最后更新: 2026-03-27
+> 版本: 0.3.0
+> 最后更新: 2026-03-29
 
-本文档定义主程序（Game Controller / Agent）与 LLM 适配器（Adapter）之间的统一通信契约，确保任意 LLM 后端均可无缝接入。
+本文档定义主程序（Game Controller / Agent）与 LLM 适配器（Adapter）之间的统一通信契约，以及 Web 3D 模块的 WebSocket 通信协议，确保任意 LLM 后端均可无缝接入。
 
 ---
 
@@ -71,20 +71,20 @@ GameState → LLMAgent.think() → [PromptBuilder → Adapter.chat()] → AgentR
 
 ## 2. 核心数据结构
 
-### 2.1 GameState（游戏状态）
+### 2.1 GameState（游戏状态 — 核心版）
 
-主程序传递给 Agent 的完整棋局信息。
+主程序传递给 Agent 的完整棋局信息，定义在 `src/core/state_serializer.py`。
 
 ```python
 @dataclass
 class GameState:
-    turn: str                        # 当前方: "Red" | "Black"
+    turn: str                        # 当前方: "Red" | "Black" (首字母大写)
     fen: str                         # FEN局面字符串
     ascii_board: str                 # ASCII棋盘渲染
     legal_moves: List[str]           # ICCS合法走步列表, 如 ["h2e2", "b0c2", ...]
     legal_moves_count: int           # 合法走步数量
     game_history: List[str]          # 完整走棋历史
-    last_move: Optional[str]         # 上一步走步 (ICCS)
+    last_move: Optional[str]         # 上一步走步 (ICCS, 纯字符串)
     last_move_by: Optional[str]      # 上一步执行者 (Agent名称)
     phase: GamePhase                 # 游戏阶段枚举
     result: GameResult               # 游戏结果枚举
@@ -97,7 +97,7 @@ class GameState:
   "turn": "Red",
   "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
   "ascii_board": "  a b c d e f g h i\n9 r n b a k a b n r\n...",
-  "legal_moves": ["h0g2", "h0i2", "b0c2", "b0a2", ...],
+  "legal_moves": ["h0g2", "h0i2", "b0c2", "b0a2"],
   "legal_moves_count": 44,
   "game_history": ["h2e2", "h7e7"],
   "last_move": "h7e7",
@@ -307,6 +307,8 @@ class LLMResponse:
 | system消息处理 | messages列表中 | messages列表中 | 提取为 `system` 参数 |
 | 重试策略 | 指数退避 | 指数退避 | 指数退避 + 超时递增 |
 | SDK | openai (async) | openai (async) | anthropic (sync→async) |
+
+> **性能备注**: Anthropic 适配器使用 `run_in_executor` 包装同步 SDK。当前场景下仅 2 个 Agent 串行调用，不构成瓶颈。如需高并发，可考虑使用官方 async SDK（发布后替换）。
 
 ---
 
@@ -862,16 +864,38 @@ llm:
 
 ## 10. Observer API（GUI 通知接口）
 
+GameController 通过 Observer 模式将游戏事件通知给 GUI 层（原生 3D GUI、Web 3D Server 等）。
+
+### 10.1 接口定义
+
 ```python
 class LLMAgentGameController:
     def register_observer(self, callback):
         """注册观察者回调
+
         callback 签名: callback(move: str, fen: str, is_game_over: bool)
+
+        注意:
+        - 此回调由 GameController 同步调用 (非 await)
+        - 如果 Observer 需要执行异步操作 (如 WebSocket 广播)，
+          需在回调内部使用 asyncio.ensure_future() 或
+          asyncio.get_running_loop().create_task() 调度
+        - 参见 src/web_3d/observer_bridge.py 中的实现示例
         """
 
     def unregister_observer(self, callback):
         """注销观察者"""
 ```
+
+### 10.2 参数说明
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `move` | `str` | ICCS 格式走步，如 `"h2e2"` |
+| `fen` | `str` | 走步后的 FEN 字符串 |
+| `is_game_over` | `bool` | 游戏是否结束 |
+
+> **扩展信息获取**: Observer 如需更多上下文（如 `move_cn`、`captured` piece、玩家信息等），应从 `GameController.get_current_state()` 或 `GameController.get_game_info()` 中主动获取，而非修改 Observer 回调签名，以保持向后兼容。
 
 ---
 
@@ -885,10 +909,246 @@ class LLMAgentGameController:
 | Agent | LLM 未输出可解析的走步 | 返回 `AgentResult(success=False, error="...")` |
 | Controller | 走步不在 legal_moves 中 | 返回 `MoveResult(success=False, error="Illegal move: ...")` |
 | Tool | 工具执行异常 | 返回 `{success: False, error: str(e)}` |
+| Web 3D | WebSocket 连接断开 | 客户端自动重连 (指数退避, 最大30s间隔) |
+| Web 3D | 消息解析失败 | 服务端忽略无效消息, 客户端记录 warning |
 
 ---
 
-## 12. 配置文件 schema
+## 12. 版本变更记录
+
+| 版本 | 日期 | 变更内容 |
+|------|------|---------|
+| 0.3.0 | 2026-03-29 | 新增 Web 3D WebSocket API (§13)；统一 `turn` 字段大小写为 `"Red"/"Black"`；补充 WebSocket 错误码和协议版本；补充 Observer sync/async 兼容说明 |
+| 0.2.0 | 2026-03-27 | 初始版本，覆盖 Agent/Adapter/MCP/Observer 接口 |
+
+---
+
+## 13. Web 3D API
+
+Web 3D 模块提供基于 WebSocket 的实时游戏状态同步，供浏览器客户端渲染 3D 场景观战。
+
+### 13.1 架构关系
+
+```
+┌─────────────────┐      WebSocket       ┌─────────────────┐
+│   game.py       │◄────────────────────►│  Browser Client │
+│  (Web3DServer)  │   ws://host:port/ws  │  (Three.js)     │
+│  (独立线程)      │                      │                 │
+└─────────────────┘                      └─────────────────┘
+```
+
+### 13.2 启用方式
+
+在 `game_config.yaml` 中配置：
+
+```yaml
+gui:
+  3d: false           # 原生 3D GUI (pyglet)
+  web_3d: true        # Web 3D 界面
+
+  web_3d_config:
+    host: "0.0.0.0"
+    port: 8080
+    auto_open_browser: true
+    static_dir: "src/web_3d/static"
+```
+
+> **实现状态**: `web_3d_config` 嵌套配置尚待在 `ConfigLoader.GUIConfig` 中实现。当前版本 `GUIConfig` 仅支持 `enable_3d` 和 `web_3d` 布尔字段。开发 Web 3D 模块时需同步更新 `src/utils/config_loader.py`。
+
+**重要**: Web 3D Server 在独立 daemon 线程中运行 uvicorn，随主程序自动启动和关闭，无需单独操作。
+
+### 13.3 WebSocket 连接
+
+**Endpoint**: `ws://{host}:{port}/ws`
+
+**协议版本**: `"1.0.0"`
+
+**连接流程**:
+1. 客户端建立 WebSocket 连接
+2. 客户端发送 `client.ready`（携带 `protocol_version`）
+3. 服务端响应 `game.init`（完整初始状态）
+4. 游戏进行中，每步走棋服务端推送 `game.move`
+5. 游戏结束服务端推送 `game.game_over`
+6. 客户端可随时发送 `client.ping` 进行心跳检测
+
+### 13.4 消息协议
+
+#### 基础消息结构
+
+```typescript
+interface WebSocketMessage {
+  type: string;      // 消息类型
+  timestamp: number; // 服务端时间戳 (ms)
+  payload: any;      // 消息体
+}
+```
+
+#### 服务端 → 客户端
+
+| Type | 描述 | Payload |
+|------|------|---------|
+| `game.init` | 客户端就绪后发送完整初始状态 | `WebSocketGameState` |
+| `game.move` | 棋子移动（增量更新） | `MoveEvent` |
+| `game.game_over` | 游戏结束 | `GameOverEvent` |
+| `server.error` | 错误通知 | `{ code: ErrorCode, message: string }` |
+| `server.pong` | 心跳响应 | `{ id: number }` |
+
+#### 客户端 → 服务端
+
+| Type | 描述 | Payload |
+|------|------|---------|
+| `client.ready` | 客户端就绪，请求初始状态 | `{ client_id?: string, protocol_version: string }` |
+| `client.ping` | 心跳检测 | `{ id: number }` |
+
+#### 错误码定义
+
+| Error Code | Description |
+|------------|-------------|
+| `PROTOCOL_VERSION_MISMATCH` | 客户端协议版本不兼容 |
+| `PARSE_ERROR` | 消息格式解析失败 |
+| `INTERNAL_ERROR` | 服务端内部错误 |
+
+### 13.5 数据结构
+
+> **重要**: 以下 WebSocket 专用数据结构与 §2.1 核心 `GameState` 是**独立定义**。核心 `GameState` 用于 Agent 交互，字段包含 `ascii_board`、`legal_moves` 等 Agent 所需信息；WebSocket `GameState` 用于浏览器渲染，字段包含 `players`、`last_move` 对象等渲染所需信息。两者通过 `Web3DServer` 桥接转换。
+
+#### WebSocketGameState (完整游戏状态 — WebSocket 专用)
+
+```python
+@dataclass
+class WebSocketGameState:
+    turn: Literal["Red", "Black"]           # 与核心 GameState 一致，首字母大写
+    turn_number: int
+    fen: str
+    players: dict[Literal["Red", "Black"], PlayerInfo]
+    move_history: list[str]                 # ICCS 走步列表
+    last_move: Optional[LastMove] = None
+    status: Literal["playing", "finished"]
+    result: Optional[dict] = None
+    result_reason: Optional[str] = None
+    legal_moves: list[str] = field(default_factory=list)
+
+@dataclass
+class PlayerInfo:
+    name: str
+    model: str
+
+@dataclass
+class LastMove:
+    from_pos: str     # ICCS, e.g., "h2"
+    to_pos: str       # ICCS, e.g., "e2"
+    piece: str        # 棋子字符, e.g., "R"
+    captured: Optional[str] = None
+```
+
+**与核心 GameState 的关键区别**:
+
+| 差异点 | 核心 `GameState` | WebSocket `GameState` |
+|--------|-----------------|----------------------|
+| `last_move` | `Optional[str]` (ICCS 走步) | `Optional[LastMove]` (结构化对象) |
+| `players` | 无 | `{ "Red": PlayerInfo, "Black": PlayerInfo }` |
+| `ascii_board` | 有 | 无 (浏览器不需要) |
+| `turn` | `"Red"` / `"Black"` | `"Red"` / `"Black"` (一致) |
+
+#### MoveEvent (棋子移动事件)
+
+```python
+@dataclass
+class MoveEvent:
+    move: str              # ICCS 格式, e.g., "h2e2"
+    move_cn: Optional[str] = None  # 中文记谱 (TODO: 待实现 ICCS→中文转换)
+    piece: str             # 棋子字符, e.g., "R"
+    from_pos: str          # 起始 ICCS
+    to_pos: str            # 目标 ICCS
+    captured: Optional[str] = None
+    fen_after: str         # 移动后 FEN
+    turn_number: int
+    animation_duration: float = 0.5
+```
+
+**序列化示例**:
+```json
+{
+  "type": "game.move",
+  "timestamp": 1711699200000,
+  "payload": {
+    "move": "h2e2",
+    "move_cn": null,
+    "piece": "R",
+    "from_pos": "h2",
+    "to_pos": "e2",
+    "captured": null,
+    "fen_after": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CR5C1/9/RNBAKABNR b - - 1 1",
+    "turn_number": 1,
+    "animation_duration": 0.5
+  }
+}
+```
+
+#### GameOverEvent (游戏结束事件)
+
+```python
+@dataclass
+class GameOverEvent:
+    result: str            # "red_win" | "black_win" | "draw"
+    result_reason: str     # 结束原因描述
+    turn_count: int        # 总回合数
+    move_history: list[str]  # 完整走步历史
+    winner: Optional[str] = None  # "Red" | "Black" | None (平局)
+```
+
+### 13.6 Observer 集成
+
+Web 3D Server 通过 GameController 的 Observer 接口接收状态更新。由于 Observer 是同步回调，而 WebSocket 广播是异步操作，需要桥接层：
+
+```python
+# game.py
+from src.web_3d import Web3DServer
+from src.web_3d.observer_bridge import make_sync_observer
+
+async def run_battle(..., gui_config: GUIConfig):
+    controller = LLMAgentGameController(...)
+
+    if gui_config and gui_config.web_3d:
+        web_server = Web3DServer(gui_config.web_3d_config)
+        web_server.start()
+
+        # 使用桥接函数将 async 广播适配到 sync Observer 回调
+        controller.register_observer(make_sync_observer(web_server))
+```
+
+```python
+# src/web_3d/observer_bridge.py
+import asyncio
+
+def make_sync_observer(web_server) -> callable:
+    """创建同步 Observer，内部通过 create_task 调度 async 广播"""
+    def on_state_update(move: str, fen: str, is_game_over: bool):
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                web_server.broadcast_move(move, fen, is_game_over)
+            )
+        except RuntimeError:
+            pass  # 无运行中的事件循环时静默跳过
+
+    return on_state_update
+```
+
+### 13.7 浏览器支持
+
+| 浏览器 | 最低版本 | WebGPU | WebGL Fallback |
+|--------|---------|--------|----------------|
+| Chrome | 113+ | Yes | Yes |
+| Edge | 113+ | Yes | Yes |
+| Safari | 26+ | Yes | Yes |
+| Firefox | 141+ (Win) | Yes | Yes |
+
+> WebGL 2.0 fallback 时 TSL 特效不可用，自动替换为简化视觉效果。
+
+---
+
+## 14. 配置文件 schema
 
 ### Agent 配置 (`config/agentX_config.yaml`)
 
@@ -922,6 +1182,20 @@ game:
   time_control:
     enabled: bool            # 是否启用时限
     seconds_per_turn: int    # 每步秒数
+
+gui:
+  3d: bool                   # 原生 3D GUI (pyglet), 默认 false
+  web_3d: bool               # Web 3D 界面, 默认 true
+
+  # Web 3D 配置 (当 web_3d: true 时生效)
+  # 注意: 嵌套配置加载待实现，参见 §13.2
+  web_3d_config:
+    host: string             # 绑定地址, 默认 "0.0.0.0"
+    port: int                # 服务端口, 默认 8080
+    auto_open_browser: bool  # 自动打开浏览器, 默认 true
+    static_dir: string       # 静态文件目录, 默认 "src/web_3d/static"
+    shadow_map_size: int     # 阴影贴图大小, 默认 2048
+    animation_duration: float # 动画持续时间(秒), 默认 0.5
 
 mcp_tools:
   enabled: bool              # 是否启用MCP工具

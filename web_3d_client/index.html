@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Web 3D 中国象棋对战平台 - LLM Agent 对战可视化">
+  <title>LLM-Xiangqi WEB</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟️</text></svg>">
+  
+  <!-- Preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+  <div id="app">
+    <!-- 头部 -->
+    <header>
+      <h1>LLM-Xiangqi WEB</h1>
+      <div class="renderer-info">
+        <span id="renderer-info" class="renderer-badge">初始化中...</span>
+      </div>
+    </header>
+
+    <!-- 主体 -->
+    <main>
+      <!-- 游戏画布区域 -->
+      <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <!-- 错误提示 -->
+        <div id="error-message"></div>
+        
+        <!-- 游戏结果 -->
+        <div id="game-result" class="game-result">
+          <div class="result-title">游戏结束</div>
+          <div class="result-text">-</div>
+          <div class="result-reason">-</div>
+        </div>
+        
+        <!-- 加载动画 (初始显示) -->
+        <div id="loading" class="loading">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">正在初始化 3D 引擎...</div>
+          <div class="loading-subtext">请稍候，首次加载可能需要几秒钟</div>
+        </div>
+      </div>
+
+      <!-- 侧边栏 -->
+      <aside>
+        <!-- 连接状态 -->
+        <div class="connection-status">
+          <span class="status-label">连接状态:</span>
+          <span id="connection-status" class="status-badge disconnected">未连接</span>
+        </div>
+
+        <!-- 回合信息 -->
+        <div class="turn-info">
+          <div id="turn-info">等待游戏开始...</div>
+        </div>
+
+        <!-- 玩家信息 -->
+        <div class="players-section">
+          <h3>对战双方</h3>
+          <div id="red-player" class="player-card red">
+            <div class="player-name">红方</div>
+            <div class="player-model">-</div>
+          </div>
+          <div id="black-player" class="player-card black">
+            <div class="player-name">黑方</div>
+            <div class="player-model">-</div>
+          </div>
+        </div>
+
+        <!-- 走步历史 -->
+        <div class="history-section">
+          <h3>走步记录</h3>
+          <div id="move-history" class="history-content">
+            暂无走步记录
+          </div>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="controls-section">
+          <h3>控制</h3>
+          <div class="control-buttons">
+            <button id="btn-reset-camera" class="control-btn" title="重置相机视角">
+              <span>📷</span> 重置视角
+            </button>
+            <button id="btn-toggle-sound" class="control-btn" title="开关音效">
+              <span>🔊</span> 音效
+            </button>
+            <button id="btn-help" class="control-btn" title="操作说明">
+              <span>❓</span> 帮助
+            </button>
+          </div>
+          <div class="volume-control">
+            <label for="volume-slider">音量</label>
+            <input type="range" id="volume-slider" min="0" max="100" value="50">
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- 应用入口 -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

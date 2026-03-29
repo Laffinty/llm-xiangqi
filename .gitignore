@@ -61,3 +61,13 @@ Thumbs.db
 # Local config (contains API keys)
 config/local_*.yaml
 config/*.local.yaml
+
+# Node.js / Web 3D Client
+node_modules/
+web_3d_client/node_modules/
+web_3d_client/dist/
+web_3d_client/dist-ssr/
+web_3d_client/*.local
+
+# Build outputs
+*.tsbuildinfo

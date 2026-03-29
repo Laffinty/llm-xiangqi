@@ -14,3 +14,9 @@ httpx>=0.26.0
 
 # 3D GUI
 pyglet>=1.5.0,<2.0
+
+# Web 3D Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=14.0
+python-multipart>=0.0.5

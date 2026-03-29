@@ -84,19 +84,35 @@ pip install -r requirements.txt
 
 #### 2. 配置 API Keys
 
-编辑配置文件填入 API Key：
-- `config/agent1_config.yaml` - 红方 Agent
-- `config/agent2_config.yaml` - 黑方 Agent
+**方式一：环境变量（推荐，更安全）**
+
+```bash
+# Linux/macOS
+export DEEPSEEK_API_KEY="sk-xxx"
+export MIMO_API_KEY="sk-xxx"
+
+# Windows PowerShell
+$env:DEEPSEEK_API_KEY="sk-xxx"
+$env:MIMO_API_KEY="sk-xxx"
+```
+
+**方式二：本地配置文件（不被 Git 追踪）**
+
+创建 `config/agent1_config.local.yaml` 或编辑原配置：
 
 ```yaml
 llm:
   provider: "deepseek"
   model: "deepseek-chat"
-  api_key: "sk-xxx"
+  api_key: "${DEEPSEEK_API_KEY}"  # 或硬编码 "sk-xxx"
   base_url: "https://api.deepseek.com"
   temperature: 0.7
   max_tokens: 2048
 ```
+
+配置文件：
+- `config/agent1_config.yaml` - 红方 Agent
+- `config/agent2_config.yaml` - 黑方 Agent
 
 #### 3. 运行对战
 
@@ -151,10 +167,13 @@ llm-xiangqi/
 ├── src/
 │   ├── agents/                # Agent 实现
 │   ├── core/                  # 核心引擎 (裁判、状态、控制器)
-│   ├── gui/                   # 3D 可视化界面
+│   ├── gui/                   # 3D 可视化界面 (pyglet)
 │   ├── llm_adapters/          # LLM 适配器 (统一 API)
 │   ├── mcp_tools/             # MCP Tools
 │   └── utils/                 # 工具函数
+├── web_3d_client/             # Web 3D 可视化界面 (Three.js)
+│   ├── src/                   # 前端源码
+│   └── index.html             # 入口页面
 ├── docs/
 │   └── api-standard.md        # API 详细文档
 ├── tests/
@@ -168,7 +187,21 @@ llm-xiangqi/
 - **双协议支持**：OpenAI 兼容协议 + Anthropic 兼容协议
 - **完整的中国象棋规则引擎**：棋子移动验证、将军/应将检测、胜负判定
 - **3D 可视化**：基于 pyglet/OpenGL 的实时渲染
+- **Web 3D 可视化**：基于 Three.js 的网页端 3D 界面
 - **MCP Tools 集成**：支持通过 MCP 协议扩展 Agent 工具能力
+
+### Web 3D 可视化界面
+
+项目包含基于 Three.js 的 Web 3D 可视化界面：
+
+```bash
+cd web_3d_client
+npm install
+npm run dev          # 启动开发服务器
+npm run build        # 构建生产版本
+```
+
+访问 http://localhost:5173/ 查看 3D 棋盘。
 
 ---
 
@@ -252,19 +285,35 @@ pip install -r requirements.txt
 
 #### 2. Configure API Keys
 
-Edit configuration files:
-- `config/agent1_config.yaml` - Red Agent
-- `config/agent2_config.yaml` - Black Agent
+**Option 1: Environment Variables (Recommended, Safer)**
+
+```bash
+# Linux/macOS
+export DEEPSEEK_API_KEY="sk-xxx"
+export MIMO_API_KEY="sk-xxx"
+
+# Windows PowerShell
+$env:DEEPSEEK_API_KEY="sk-xxx"
+$env:MIMO_API_KEY="sk-xxx"
+```
+
+**Option 2: Local Config File (Not tracked by Git)**
+
+Create `config/agent1_config.local.yaml` or edit the original config:
 
 ```yaml
 llm:
   provider: "deepseek"
   model: "deepseek-chat"
-  api_key: "sk-xxx"
+  api_key: "${DEEPSEEK_API_KEY}"  # or hardcode "sk-xxx"
   base_url: "https://api.deepseek.com"
   temperature: 0.7
   max_tokens: 2048
 ```
+
+Config files:
+- `config/agent1_config.yaml` - Red Agent
+- `config/agent2_config.yaml` - Black Agent
 
 #### 3. Run Battle
 
@@ -319,10 +368,13 @@ llm-xiangqi/
 ├── src/
 │   ├── agents/                # Agent implementations
 │   ├── core/                  # Core engine (referee, state, controller)
-│   ├── gui/                   # 3D visualization
+│   ├── gui/                   # 3D visualization (pyglet)
 │   ├── llm_adapters/          # LLM adapters (unified API)
 │   ├── mcp_tools/             # MCP Tools
 │   └── utils/                 # Utilities
+├── web_3d_client/             # Web 3D visualization (Three.js)
+│   ├── src/                   # Frontend source code
+│   └── index.html             # Entry page
 ├── docs/
 │   └── api-standard.md        # Detailed API documentation
 ├── tests/
@@ -336,7 +388,21 @@ llm-xiangqi/
 - **Dual Protocol Support**: OpenAI-compatible + Anthropic-compatible protocols
 - **Complete Chinese Chess Rules Engine**: Move validation, check detection, win/loss determination
 - **3D Visualization**: Real-time rendering based on pyglet/OpenGL
+- **Web 3D Visualization**: Web-based 3D interface powered by Three.js
 - **MCP Tools Integration**: Extend Agent capabilities via MCP protocol
+
+### Web 3D Visualization
+
+The project includes a Web 3D visualization interface based on Three.js:
+
+```bash
+cd web_3d_client
+npm install
+npm run dev          # Start development server
+npm run build        # Build production version
+```
+
+Visit http://localhost:5173/ to view the 3D chessboard.
 
 ---
 

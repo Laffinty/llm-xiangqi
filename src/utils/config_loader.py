@@ -89,12 +89,42 @@ class LoggingConfig:
 
 
 @dataclass
+class Web3DRenderingConfig:
+    """Web 3D 渲染配置"""
+
+    shadow_map_size: int = 2048
+    default_camera_position: list = field(default_factory=lambda: [8, 12, 12])
+    animation_duration: float = 0.5
+
+
+@dataclass
+class Web3DConfig:
+    """Web 3D 配置"""
+
+    host: str = "0.0.0.0"
+    port: int = 8080
+    auto_open_browser: bool = True
+    static_dir: str = "src/web_3d/static"
+    rendering: Web3DRenderingConfig = field(default_factory=Web3DRenderingConfig)
+
+
+@dataclass
+class GUIConfig:
+    """GUI配置"""
+
+    enable_3d: bool = False
+    web_3d: bool = True
+    web_3d_config: Web3DConfig = field(default_factory=Web3DConfig)
+
+
+@dataclass
 class AppConfig:
     """应用完整配置"""
 
     game: GameConfig
     mcp_tools: MCPToolsConfig
     logging: LoggingConfig
+    gui: GUIConfig
 
 
 class ConfigLoader:
@@ -193,4 +223,57 @@ class ConfigLoader:
             level=logging_data.get("level", "INFO"),
             file=logging_data.get("file", "logs/game.log"),
             console=logging_data.get("console", True),
+        )
+
+    @classmethod
+    def load_mcp_tools_config(cls, path: str) -> MCPToolsConfig:
+        """加载MCP工具配置"""
+        data = cls.load_yaml(path)
+        mcp_data = data.get("mcp_tools", {})
+
+        return MCPToolsConfig(
+            enabled=mcp_data.get("enabled", True),
+            tools_dir=mcp_data.get("tools_dir", "data/opening_books"),
+        )
+
+    @classmethod
+    def load_gui_config(cls, path: str) -> GUIConfig:
+        """加载GUI配置"""
+        data = cls.load_yaml(path)
+        gui_data = data.get("gui", {})
+
+        # 加载 web_3d_config
+        web_3d_config_data = gui_data.get("web_3d_config", {})
+        rendering_data = web_3d_config_data.get("rendering", {})
+
+        rendering_config = Web3DRenderingConfig(
+            shadow_map_size=rendering_data.get("shadow_map_size", 2048),
+            default_camera_position=rendering_data.get(
+                "default_camera_position", [8, 12, 12]
+            ),
+            animation_duration=rendering_data.get("animation_duration", 0.5),
+        )
+
+        web_3d_config = Web3DConfig(
+            host=web_3d_config_data.get("host", "0.0.0.0"),
+            port=web_3d_config_data.get("port", 8080),
+            auto_open_browser=web_3d_config_data.get("auto_open_browser", True),
+            static_dir=web_3d_config_data.get("static_dir", "src/web_3d/static"),
+            rendering=rendering_config,
+        )
+
+        return GUIConfig(
+            enable_3d=gui_data.get("3d", False),
+            web_3d=gui_data.get("web_3d", True),
+            web_3d_config=web_3d_config,
+        )
+
+    @classmethod
+    def load_app_config(cls, path: str) -> AppConfig:
+        """加载完整的应用配置"""
+        return AppConfig(
+            game=cls.load_game_config(path),
+            mcp_tools=cls.load_mcp_tools_config(path),
+            logging=cls.load_logging_config(path),
+            gui=cls.load_gui_config(path),
         )
