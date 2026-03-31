@@ -2,12 +2,18 @@
 日志模块
 
 提供统一的日志接口，支持文件和控制台输出
+日志级别可通过环境变量 LOG_LEVEL 配置
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional
+
+# 默认日志级别，可通过环境变量覆盖
+DEFAULT_LOG_LEVEL = "INFO"
+ENV_LOG_LEVEL = "LOG_LEVEL"
 
 
 def _ensure_utf8_stdout():
@@ -66,7 +72,20 @@ class Logger:
 
 
 def get_logger(
-    name: str, level: str = "INFO", log_file: Optional[str] = None
+    name: str, level: Optional[str] = None, log_file: Optional[str] = None
 ) -> logging.Logger:
-    """便捷函数：获取日志实例"""
+    """便捷函数：获取日志实例
+    
+    日志级别优先级：参数 > 环境变量 LOG_LEVEL > 默认值 INFO
+    
+    Args:
+        name: 日志器名称
+        level: 日志级别（可选，默认从环境变量读取）
+        log_file: 日志文件路径（可选）
+        
+    Returns:
+        logging.Logger: 配置好的日志实例
+    """
+    if level is None:
+        level = os.environ.get(ENV_LOG_LEVEL, DEFAULT_LOG_LEVEL)
     return Logger.get_logger(name, level, log_file)

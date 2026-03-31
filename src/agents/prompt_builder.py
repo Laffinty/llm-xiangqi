@@ -7,8 +7,34 @@ Prompt构建器
 3. 可用的MCP工具定义
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypedDict, Literal
 from pathlib import Path
+
+
+# 类型定义
+class AnnotatedMoveDict(TypedDict):
+    """带标注的走步字典"""
+    move: str
+    annotations: List[str]
+
+
+class GameStateDict(TypedDict, total=False):
+    """游戏状态字典类型"""
+    turn: Literal["Red", "Black"]
+    fen: str
+    ascii_board: str
+    legal_moves: List[str]
+    legal_moves_count: int
+    game_history: List[str]
+    last_move: Optional[str]
+    last_move_by: Optional[str]
+    phase: str
+    result: str
+    result_reason: Optional[str]
+    annotated_moves: List[AnnotatedMoveDict]
+    proposed_move: Optional[str]
+    violated_move: Optional[str]
+    violation_reason: Optional[str]
 
 
 class PromptBuilder:
@@ -99,7 +125,7 @@ class PromptBuilder:
         return cls(system_prompt=content)
 
     def build_game_prompt(
-        self, game_state: Dict[str, Any], player_color: Optional[str] = None
+        self, game_state: GameStateDict, player_color: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """构建游戏状态prompt
 
@@ -168,7 +194,7 @@ class PromptBuilder:
             return f"弃{self._PIECE_TYPE_CN.get(piece_type, piece_type)}"
         return ann
 
-    def _format_game_state(self, state: Dict[str, Any]) -> str:
+    def _format_game_state(self, state: GameStateDict) -> str:
         """格式化游戏状态"""
         annotated_moves = state.get("annotated_moves", [])
 
@@ -300,7 +326,7 @@ class PromptBuilder:
         return "\n".join(lines)
 
     def build_validation_prompt(
-        self, game_state: Dict[str, Any]
+        self, game_state: GameStateDict
     ) -> List[Dict[str, str]]:
         """构建验证prompt"""
         user_content = f"""验证以下走步是否合法：
@@ -316,7 +342,7 @@ class PromptBuilder:
         return self.build_messages(self.system_prompt, user_content)
 
     def build_explanation_prompt(
-        self, game_state: Dict[str, Any]
+        self, game_state: GameStateDict
     ) -> List[Dict[str, str]]:
         """构建解释prompt"""
         user_content = f"""解释以下违规：

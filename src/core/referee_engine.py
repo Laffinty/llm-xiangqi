@@ -21,6 +21,15 @@ import re
 # 初始局面FEN
 INITIAL_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
 
+# FEN格式验证正则表达式
+# 格式: 棋盘部分 + 空格 + 行棋方(w/b) + 其余可选字段
+FEN_PATTERN = re.compile(
+    r'^[rnbakabnrpcRNBAKABNRPC1-9/]+ [wb](?: - - \d+ \d+)?$'
+)
+
+# 中国象棋FEN最大长度（安全限制）
+MAX_FEN_LENGTH = 200
+
 # 棋子符号映射
 PIECE_NAMES = {
     "K": "将",
@@ -211,9 +220,38 @@ class RefereeEngine:
         self.move_history: List[str] = []
         self.board = Board()
         self._parse_fen(fen)
+        # 位置历史（FEN列表）
         self.position_history: List[str] = []
+        # 将军历史（记录每回合是否将军）
         self.check_history: List[bool] = []
+        # 位置计数器（用于快速检测重复局面）
+        self._position_counter: Dict[str, int] = {}
 
+    def _validate_fen_format(self, fen: str) -> None:
+        """验证FEN字符串的基本格式
+        
+        Args:
+            fen: FEN格式的局面字符串
+            
+        Raises:
+            TypeError: 当fen不是字符串时
+            ValueError: 当FEN格式无效时
+        """
+        # 输入类型验证
+        if not isinstance(fen, str):
+            raise TypeError(f"FEN must be a string, got {type(fen).__name__}")
+        
+        if not fen.strip():
+            raise ValueError("FEN cannot be empty")
+        
+        # 长度验证（防止异常输入）
+        if len(fen) > MAX_FEN_LENGTH:
+            raise ValueError(f"FEN string too long (max {MAX_FEN_LENGTH}): {len(fen)} chars")
+        
+        # 基础格式验证（使用正则）
+        if not FEN_PATTERN.match(fen):
+            raise ValueError(f"Invalid FEN format: {fen[:50]}...")
+    
     def _parse_fen(self, fen: str) -> None:
         """解析FEN字符串并设置棋盘
         
@@ -224,12 +262,8 @@ class RefereeEngine:
             ValueError: 当FEN格式无效时
             TypeError: 当fen不是字符串时
         """
-        # 输入类型验证
-        if not isinstance(fen, str):
-            raise TypeError(f"FEN must be a string, got {type(fen).__name__}")
-        
-        if not fen.strip():
-            raise ValueError("FEN cannot be empty")
+        # 基础格式验证
+        self._validate_fen_format(fen)
         
         parts = fen.split()
         if len(parts) < 1:
@@ -816,6 +850,10 @@ class RefereeEngine:
         self.move_history.append(iccs_move)
 
         self.position_history.append(self.current_fen)
+        
+        # 更新位置计数器（只比较棋盘部分）
+        board_key = self.current_fen.split()[0] if ' ' in self.current_fen else self.current_fen
+        self._position_counter[board_key] = self._position_counter.get(board_key, 0) + 1
 
         after_check = self.is_king_in_check(self.board.current_color.opposite())
         self.check_history.append(before_check or after_check)
@@ -852,6 +890,7 @@ class RefereeEngine:
         """检查是否出现三次重复局面
 
         中国象棋规则：相同局面出现三次，可以判和
+        优先使用位置计数器进行快速检测，如果计数器不可用则回退到列表计数
 
         Returns:
             True 表示出现三次重复局面
@@ -859,11 +898,17 @@ class RefereeEngine:
         if len(self.position_history) < 5:
             return False
 
-        current_pos = self.position_history[-1] if self.position_history else ""
-        if not current_pos:
-            return False
-
-        count = self.position_history.count(current_pos)
+        current_board = self.current_fen.split()[0] if ' ' in self.current_fen else self.current_fen
+        
+        # 优先使用位置计数器快速检查
+        count = self._position_counter.get(current_board, 0)
+        if count >= 3:
+            return True
+        
+        # 如果计数器不可用（如测试直接操作position_history），回退到列表计数
+        if count == 0:
+            count = self.position_history.count(self.current_fen)
+        
         return count >= 3
 
     def _find_king_position(self, color: Color) -> Optional[Position]:
@@ -1085,6 +1130,7 @@ class RefereeEngine:
         self._parse_fen(fen)
         self.position_history = []
         self.check_history = []
+        self._position_counter = {}
 
 
 # 示例用法

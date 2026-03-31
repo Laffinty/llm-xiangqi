@@ -6,7 +6,20 @@ LLM适配器基类
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TypedDict
+
+
+# 类型定义
+class MessageDict(TypedDict):
+    """消息字典类型"""
+    role: str
+    content: str
+
+
+class ToolCallDict(TypedDict):
+    """工具调用字典类型"""
+    name: str
+    arguments: Dict[str, Any]
 
 
 @dataclass
@@ -14,8 +27,8 @@ class LLMResponse:
     """LLM响应结构"""
     content: str
     thought: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    raw_response: Any = None
+    tool_calls: Optional[List[ToolCallDict]] = None
+    raw_response: Optional[Any] = None
 
     def has_tool_calls(self) -> bool:
         """检查是否有工具调用"""
@@ -30,7 +43,12 @@ class ToolCall:
 
 
 class BaseLLMAdapter(ABC):
-    """LLM适配器基类"""
+    """LLM适配器基类
+    
+    支持异步上下文管理器语法：
+        async with DeepSeekAdapter(...) as adapter:
+            response = await adapter.chat(...)
+    """
 
     def __init__(
         self,
@@ -50,6 +68,14 @@ class BaseLLMAdapter(ABC):
         self.temperature = temperature
         self.max_tokens = max_tokens
     
+    async def __aenter__(self):
+        """异步上下文管理器入口"""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器出口，确保资源被释放"""
+        await self.close()
+    
     def _mask_api_key(self, key: str) -> str:
         """API Key脱敏显示
         
@@ -68,9 +94,9 @@ class BaseLLMAdapter(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
+        messages: List[MessageDict],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        **kwargs: Any
     ) -> LLMResponse:
         """发送聊天请求
 
@@ -93,8 +119,8 @@ class BaseLLMAdapter(ABC):
         self,
         system_prompt: str,
         user_content: str,
-        history: Optional[List[Dict[str, str]]] = None
-    ) -> List[Dict[str, str]]:
+        history: Optional[List[MessageDict]] = None
+    ) -> List[MessageDict]:
         """构建消息列表
 
         Args:

@@ -6,12 +6,45 @@ Agent基类
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TypedDict, Literal
 from enum import Enum
 
 from ..llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
 from .prompt_builder import PromptBuilder
 from ..utils.logger import get_logger
+
+
+# 类型定义
+class GameStateDict(TypedDict, total=False):
+    """游戏状态字典类型"""
+    turn: Literal["Red", "Black"]
+    fen: str
+    ascii_board: str
+    legal_moves: List[str]
+    legal_moves_count: int
+    game_history: List[str]
+    last_move: Optional[str]
+    last_move_by: Optional[str]
+    phase: str
+    result: str
+    result_reason: Optional[str]
+    annotated_moves: List[Dict[str, Any]]
+    proposed_move: Optional[str]
+    violated_move: Optional[str]
+    violation_reason: Optional[str]
+
+
+class ToolCallDict(TypedDict):
+    """工具调用字典类型"""
+    name: str
+    arguments: Dict[str, Any]
+
+
+class ToolResultDict(TypedDict):
+    """工具结果字典类型"""
+    tool: str
+    arguments: Dict[str, Any]
+    result: Any
 
 
 class AgentStatus(Enum):
@@ -58,7 +91,7 @@ class BaseAgent(ABC):
         self.last_response: Optional[LLMResponse] = None
 
     @abstractmethod
-    async def think(self, game_state: Dict[str, Any]) -> AgentResult:
+    async def think(self, game_state: GameStateDict) -> AgentResult:
         """思考并返回走步
 
         Args:
@@ -73,7 +106,7 @@ class BaseAgent(ABC):
         self,
         initial_response: LLMResponse,
         tool_executor,
-        game_state: Dict[str, Any]
+        game_state: GameStateDict
     ) -> AgentResult:
         """执行工具调用循环直到得到最终走步
 
@@ -182,7 +215,7 @@ class BaseAgent(ABC):
         except Exception:
             return None
 
-    def _format_tool_results(self, tool_results: List[Dict]) -> str:
+    def _format_tool_results(self, tool_results: List[ToolResultDict]) -> str:
         """格式化工具结果用于反思prompt"""
         formatted = []
         for tr in tool_results:
@@ -197,7 +230,7 @@ class BaseAgent(ABC):
     def _extract_move(
         self,
         content: str,
-        legal_moves: List[str] = None
+        legal_moves: Optional[List[str]] = None
     ) -> Optional[str]:
         """从响应内容中提取走步
 
@@ -247,7 +280,7 @@ class BaseAgent(ABC):
         self.prompt_builder.clear_history()
         self.last_response = None
 
-    def add_correction_feedback(self, error_msg: str, legal_moves: List[str] = None) -> None:
+    def add_correction_feedback(self, error_msg: str, legal_moves: Optional[List[str]] = None) -> None:
         """添加纠正性反馈到prompt历史，强制LLM修正错误
 
         Args:

@@ -22,6 +22,25 @@ class LLMConfig:
     temperature: float = 0.7
     max_tokens: int = 2048
     timeout: int = 30
+    
+    def __post_init__(self):
+        """验证配置值的有效性"""
+        if not isinstance(self.provider, str) or not self.provider.strip():
+            raise ValueError("LLM provider is required and must be a non-empty string")
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ValueError(f"Model is required for provider: {self.provider}")
+        if not isinstance(self.api_key, str) or not self.api_key.strip():
+            raise ValueError(f"API key is required for provider: {self.provider}")
+        if not isinstance(self.base_url, str) or not self.base_url.strip():
+            raise ValueError(f"Base URL is required for provider: {self.provider}")
+        if not isinstance(self.temperature, (int, float)):
+            raise TypeError(f"Temperature must be a number, got {type(self.temperature)}")
+        if not 0 <= self.temperature <= 2:
+            raise ValueError(f"Temperature must be in [0, 2], got {self.temperature}")
+        if not isinstance(self.max_tokens, int) or self.max_tokens <= 0:
+            raise ValueError(f"max_tokens must be a positive integer, got {self.max_tokens}")
+        if not isinstance(self.timeout, int) or self.timeout <= 0:
+            raise ValueError(f"timeout must be a positive integer, got {self.timeout}")
 
 
 @dataclass
@@ -37,6 +56,19 @@ class AgentConfig:
     retry_delay: int = 2
     use_tools: bool = True
     use_reflection: bool = False
+    
+    def __post_init__(self):
+        """验证配置值的有效性"""
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("Agent name is required and must be a non-empty string")
+        if not isinstance(self.color, str) or self.color not in ("Red", "Black"):
+            raise ValueError(f"Agent color must be 'Red' or 'Black', got: {self.color}")
+        if not isinstance(self.system_prompt_file, str) or not self.system_prompt_file.strip():
+            raise ValueError(f"System prompt file is required for agent: {self.name}")
+        if not isinstance(self.max_retries, int) or self.max_retries < 0:
+            raise ValueError(f"max_retries must be a non-negative integer, got {self.max_retries}")
+        if not isinstance(self.retry_delay, int) or self.retry_delay < 0:
+            raise ValueError(f"retry_delay must be a non-negative integer, got {self.retry_delay}")
 
 
 @dataclass
@@ -77,6 +109,13 @@ class GameConfig:
     )
     time_control: TimeControlConfig = field(default_factory=TimeControlConfig)
     max_turns: int = 200
+    
+    def __post_init__(self):
+        """验证配置值的有效性"""
+        if not isinstance(self.initial_fen, str) or not self.initial_fen.strip():
+            raise ValueError("initial_fen must be a non-empty string")
+        if not isinstance(self.max_turns, int) or self.max_turns <= 0:
+            raise ValueError(f"max_turns must be a positive integer, got {self.max_turns}")
 
 
 @dataclass
@@ -86,6 +125,19 @@ class LoggingConfig:
     level: str = "INFO"
     file: str = "logs/game.log"
     console: bool = True
+    
+    # 有效的日志级别
+    VALID_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    
+    def __post_init__(self):
+        """验证配置值的有效性"""
+        level_upper = self.level.upper() if isinstance(self.level, str) else ""
+        if level_upper not in self.VALID_LEVELS:
+            raise ValueError(
+                f"Invalid log level: {self.level}. "
+                f"Must be one of: {', '.join(sorted(self.VALID_LEVELS))}"
+            )
+        self.level = level_upper  # 标准化为大写
 
 
 @dataclass

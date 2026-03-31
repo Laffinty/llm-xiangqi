@@ -26,6 +26,25 @@ from ..utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+# 游戏结束原因常量
+class GameEndReasons:
+    """游戏结束原因字符串常量"""
+    # 长将判负
+    RED_PERPETUAL_CHECK = "红方长将"
+    BLACK_PERPETUAL_CHECK = "黑方长将"
+    # 胜利
+    RED_VICTORY = "红方胜利"
+    BLACK_VICTORY = "黑方胜利"
+    # 和棋
+    DRAW = "判和"
+    # 投降
+    RESIGNATION_RED = "Red resigned"
+    RESIGNATION_BLACK = "Black resigned"
+    # 其他
+    MAX_TURNS = "Maximum turns reached"
+    STALEMATE = "Stalement"
+
+
 @dataclass
 class GameController:
     """
@@ -117,15 +136,15 @@ class GameController:
         Returns:
             对应的GameResult枚举值
         """
-        if "判和" in reason:
+        if GameEndReasons.DRAW in reason:
             return GameResult.DRAW
-        if reason.startswith("红方长将"):
+        if reason.startswith(GameEndReasons.RED_PERPETUAL_CHECK):
             return GameResult.BLACK_WIN
-        if reason.startswith("黑方长将"):
+        if reason.startswith(GameEndReasons.BLACK_PERPETUAL_CHECK):
             return GameResult.RED_WIN
-        if reason.startswith("红方胜利"):
+        if reason.startswith(GameEndReasons.RED_VICTORY):
             return GameResult.RED_WIN
-        if reason.startswith("黑方胜利"):
+        if reason.startswith(GameEndReasons.BLACK_VICTORY):
             return GameResult.BLACK_WIN
         # Fallback: heuristic based on current turner losing
         from .referee_engine import Color
@@ -302,10 +321,10 @@ class LLMAgentGameController(GameController):
                 logger.info(f"{agent_name} 投降认输，原因: {result.thought}")
                 if self.phase == GamePhase.RED_TO_MOVE:
                     self.result = GameResult.BLACK_WIN
-                    self.result_reason = f"Red resigned: {result.thought}"
+                    self.result_reason = f"{GameEndReasons.RESIGNATION_RED}: {result.thought}"
                 else:
                     self.result = GameResult.RED_WIN
-                    self.result_reason = f"Black resigned: {result.thought}"
+                    self.result_reason = f"{GameEndReasons.RESIGNATION_BLACK}: {result.thought}"
                 self.phase = GamePhase.GAME_OVER
                 return MoveResult(success=True, error=None, thought=f"投降认输: {result.thought}")
 
@@ -364,7 +383,7 @@ class LLMAgentGameController(GameController):
             if self.turn_count >= self.max_turns:
                 self.phase = GamePhase.GAME_OVER
                 self.result = GameResult.DRAW
-                self.result_reason = "Maximum turns reached"
+                self.result_reason = GameEndReasons.MAX_TURNS
                 break
 
             move_result = await self.play_turn()
