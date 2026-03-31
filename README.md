@@ -62,24 +62,6 @@ python game.py
 
 ---
 
-## 支持模型
-
-| 提供商 | 默认模型 |
-|--------|----------|
-| DeepSeek | deepseek-chat |
-| MiMo | mimo-v2-pro |
-| MiniMax | MiniMax-M2.7 |
-
-## Supported Models
-
-| Provider | Default Model |
-|----------|---------------|
-| DeepSeek | deepseek-chat |
-| MiMo | mimo-v2-pro |
-| MiniMax | MiniMax-M2.7 |
-
----
-
 ## 项目结构
 
 ```
@@ -123,39 +105,11 @@ llm-xiangqi/
 ## Web 可视化
 
 ```bash
-cd web_3d_client && npm install && npm run dev
+cd web_3d_client && npm install
 ```
-
-访问 http://localhost:5173
 
 ## Web 3D
 
 ```bash
-cd web_3d_client && npm install && npm run dev
+cd web_3d_client && npm install
 ```
-
-Access at http://localhost:5173
-
----
-
-## 测试
-
-```bash
-python -m pytest tests/ -v
-```
-
-## Testing
-
-```bash
-python -m pytest tests/ -v
-```
-
----
-
-## 许可证
-
-Apache 2.0
-
-## License
-
-Apache 2.0
