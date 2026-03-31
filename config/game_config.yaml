@@ -8,7 +8,8 @@ game:
 
 mcp_tools:
   enabled: true
-  tools_dir: "data/opening_books"
+  tools_dir: "src/mcp_tools/tools"
+  auto_discover: true
   pikafish:
     enabled: false
     path: "engines/pikafish.exe"

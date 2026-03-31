@@ -1,31 +1,42 @@
 """
 MCP工具执行器
 
-统一执行各种MCP工具
+统一管理和执行各种MCP工具，支持动态加载
 """
 
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List, Type
 import asyncio
+import importlib
+import importlib.util
+import inspect
+from pathlib import Path
+
+from .base_tool import BaseTool, ToolResult
+from .opening_book import OpeningBookTool
+from .evaluate_position import EvaluatePositionTool
+from .validate_move import ValidateMoveTool
 
 
 class ToolExecutor:
     """MCP工具执行器
 
-    管理并执行各种MCP工具
+    管理并执行各种MCP工具，支持动态加载和发现
     """
 
     _instance: Optional["ToolExecutor"] = None
 
-    def __init__(self):
-        self.tools: Dict[str, Callable] = {}
-        self._opening_book = OpeningBookTool()
-        self._register_default_tools()
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
+        self._tools: Dict[str, BaseTool] = {}
+        self._tool_schemas: List[Dict[str, Any]] = []
+        self._register_builtin_tools()
+        self._auto_discover_tools()
 
     @classmethod
-    def get_instance(cls) -> "ToolExecutor":
+    def get_instance(cls, config: Optional[Dict[str, Any]] = None) -> "ToolExecutor":
         """获取单例实例"""
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(config)
         return cls._instance
 
     @classmethod
@@ -33,29 +44,86 @@ class ToolExecutor:
         """重置单例（用于测试）"""
         cls._instance = None
 
-    def _register_default_tools(self):
-        """注册默认工具"""
-        self.register(
-            "query_opening_book", self._wrap_async(self._do_query_opening_book)
+    def _register_builtin_tools(self):
+        """注册内置工具"""
+        pikafish_config = self.config.get("pikafish", {})
+
+        self.register_tool(OpeningBookTool())
+        self.register_tool(ValidateMoveTool())
+        self.register_tool(
+            EvaluatePositionTool(
+                engine_path=pikafish_config.get("path", "engines/pikafish.exe"),
+                default_depth=pikafish_config.get("depth", 15),
+                threads=pikafish_config.get("threads", 1),
+            )
         )
-        self.register(
-            "validate_and_explain", self._wrap_async(self._do_validate_and_explain)
-        )
 
-    def _wrap_async(self, func):
-        """将同步函数包装为异步函数"""
+    def _auto_discover_tools(self):
+        """自动发现外部工具"""
+        tools_dir = self.config.get("tools_dir")
+        if not tools_dir:
+            return
 
-        async def wrapper(**kwargs):
-            result = func(**kwargs)
-            if asyncio.iscoroutine(result):
-                return await result
-            return result
+        tools_path = Path(tools_dir)
+        if not tools_path.exists():
+            return
 
-        return wrapper
+        for py_file in tools_path.glob("**/*.py"):
+            if py_file.name.startswith("_"):
+                continue
+            self._load_tool_from_file(py_file)
 
-    def register(self, name: str, func: Callable):
-        """注册工具"""
-        self.tools[name] = func
+    def _load_tool_from_file(self, file_path: Path):
+        """从文件加载工具"""
+        try:
+            module_name = f"mcp_tools_external.{file_path.stem}"
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if (
+                        issubclass(obj, BaseTool)
+                        and obj is not BaseTool
+                        and not name.startswith("_")
+                    ):
+                        try:
+                            tool_instance = obj()  # type: ignore[call-arg]
+                            self.register_tool(tool_instance)
+                        except (TypeError, Exception):
+                            pass
+        except Exception:
+            pass
+
+    def register_tool(self, tool: BaseTool):
+        """注册工具实例"""
+        self._tools[tool.name] = tool
+        self._tool_schemas.append(tool.get_schema())
+
+    def unregister_tool(self, name: str) -> bool:
+        """注销工具"""
+        if name in self._tools:
+            del self._tools[name]
+            self._tool_schemas = [
+                s
+                for s in self._tool_schemas
+                if s.get("function", {}).get("name") != name
+            ]
+            return True
+        return False
+
+    def get_tool(self, name: str) -> Optional[BaseTool]:
+        """获取工具实例"""
+        return self._tools.get(name)
+
+    def get_available_tools(self) -> List[str]:
+        """获取可用工具名称列表"""
+        return list(self._tools.keys())
+
+    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+        """获取所有工具的JSON Schema（供LLM调用）"""
+        return self._tool_schemas
 
     async def execute(
         self, tool_name: str, arguments: Dict[str, Any]
@@ -67,83 +135,38 @@ class ToolExecutor:
             arguments: 工具参数
 
         Returns:
-            工具执行结果
+            工具执行结果字典
         """
-        if tool_name not in self.tools:
+        tool = self._tools.get(tool_name)
+        if not tool:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}
 
+        if not tool.enabled:
+            return {"success": False, "error": f"Tool {tool_name} is disabled"}
+
+        validation_error = tool.validate_arguments(**arguments)
+        if validation_error:
+            return {"success": False, "error": validation_error}
+
         try:
-            func = self.tools[tool_name]
-            if asyncio.iscoroutinefunction(func):
-                result = await func(**arguments)
-            else:
-                result = func(**arguments)
-            return result
+            result = await tool.execute(**arguments)
+            return result.to_dict()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def _do_query_opening_book(self, fen: str) -> Dict[str, Any]:
-        """执行开局库查询"""
-        return await self._opening_book.query(fen)
+    def set_tool_enabled(self, name: str, enabled: bool) -> bool:
+        """设置工具启用状态"""
+        tool = self._tools.get(name)
+        if tool:
+            tool.set_enabled(enabled)
+            return True
+        return False
 
-    async def _do_validate_and_explain(self, fen: str, move: str) -> Dict[str, Any]:
-        """执行走步验证"""
-        from ..core.referee_engine import RefereeEngine
-
-        try:
-            engine = RefereeEngine(fen)
-            is_valid = engine.validate_move(move)
-            legal_moves = engine.get_legal_moves()
-
-            if is_valid:
-                return {
-                    "success": True,
-                    "fen": fen,
-                    "move": move,
-                    "valid": True,
-                    "explanation": f"走步 {move} 是合法的",
-                }
-            else:
-                return {
-                    "success": True,
-                    "fen": fen,
-                    "move": move,
-                    "valid": False,
-                    "explanation": f"走步 {move} 是非法的。合法走步示例: {legal_moves[:5]}",
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "fen": fen,
-                "move": move,
-                "valid": None,
-                "explanation": f"FEN解析错误: {str(e)}",
-            }
-
-    def set_tool(self, name: str, func: Callable):
-        """设置/替换工具"""
-        self.tools[name] = func
-
-    def get_available_tools(self) -> list:
-        """获取可用工具列表"""
-        return list(self.tools.keys())
-
-
-class OpeningBookTool:
-    """开局库工具（简化实现）"""
-
-    INITIAL_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR"
-
-    async def query(self, fen: str) -> Dict[str, Any]:
-        """查询开局库
-
-        简化实现：只检查初始局面的几个常见开局
-        """
-        base_fen = fen.split()[0] if fen else ""
-
-        return {
-            "success": True,
-            "fen": fen,
-            "moves": [],
-            "evaluation": "开局库暂未实现完整开局",
-        }
+    def reload_tools(self, config: Optional[Dict[str, Any]] = None):
+        """重新加载所有工具"""
+        if config:
+            self.config = config
+        self._tools.clear()
+        self._tool_schemas.clear()
+        self._register_builtin_tools()
+        self._auto_discover_tools()
