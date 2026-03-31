@@ -57,7 +57,8 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
         **kwargs
     ) -> LLMResponse:
         """发送聊天请求（支持 Function Calling）"""
-
+        import time
+        
         params = {
             "model": self.model,
             "messages": messages,
@@ -70,9 +71,15 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             params["tool_choice"] = kwargs.get("tool_choice", "auto")
 
         last_error = None
+        start_time = time.perf_counter()
+        
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.chat.completions.create(**params)
+                elapsed_ms = (time.perf_counter() - start_time) * 1000
+                # 简单的性能日志，可由子类覆盖实现更复杂的指标收集
+                if hasattr(self, '_log_performance'):
+                    self._log_performance(elapsed_ms, attempt + 1, None)
                 return self._parse_response(response)
             except asyncio.TimeoutError:
                 last_error = Exception(f"{self.model} API timeout after {self.timeout}s")
@@ -83,6 +90,10 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
 
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        if hasattr(self, '_log_performance'):
+            self._log_performance(elapsed_ms, self.max_retries, last_error)
+        
         raise last_error or Exception(f"{self.model} API call failed")
 
     def _parse_response(self, response) -> LLMResponse:

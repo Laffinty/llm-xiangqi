@@ -12,15 +12,75 @@ from pathlib import Path
 
 
 class PromptBuilder:
-    """Prompt构建器"""
+    """Prompt构建器
+    
+    支持从文件或字符串加载system prompt，提供向后兼容的无参构造函数。
+    
+    Examples:
+        >>> # 从字符串创建（推荐）
+        >>> builder = PromptBuilder("你是一位象棋大师...")
+        >>> 
+        >>> # 从文件创建（推荐）
+        >>> builder = PromptBuilder.from_file("prompts/agent_default.txt")
+        >>> 
+        >>> # 无参创建（向后兼容，加载默认prompt）
+        >>> builder = PromptBuilder()
+    """
+    
+    DEFAULT_PROMPT_FILE = "prompts/agent_default.txt"
+    _FALLBACK_PROMPT = (
+        "你是中国象棋AI助手。根据当前局面选择最优走步。"
+        "必须输出JSON格式: {\"thought\": \"你的分析\", \"move\": \"h2e2\"}"
+    )
 
-    def __init__(self, system_prompt: str):
-        if not system_prompt:
-            raise ValueError("system_prompt is required and cannot be empty")
+    def __init__(self, system_prompt: Optional[str] = None):
+        """
+        初始化PromptBuilder
+        
+        Args:
+            system_prompt: System prompt字符串。若为None，则加载默认prompt文件。
+        
+        Raises:
+            ValueError: 当system_prompt为空字符串或默认prompt文件不存在时
+        """
+        if system_prompt is None:
+            system_prompt = self._load_default_prompt()
+        
+        if not system_prompt or not system_prompt.strip():
+            raise ValueError(
+                "system_prompt is required and cannot be empty. "
+                f"Ensure {self.DEFAULT_PROMPT_FILE} exists or provide a valid prompt."
+            )
+        
         self.system_prompt = system_prompt
         self.history: List[Dict[str, str]] = []
         self.tool_results: List[Dict[str, Any]] = []
         self.tools: List[Dict[str, Any]] = MCP_TOOLS
+    
+    @classmethod
+    def _load_default_prompt(cls) -> str:
+        """
+        加载默认system prompt
+        
+        按优先级尝试：
+        1. DEFAULT_PROMPT_FILE 文件内容
+        2. _FALLBACK_PROMPT 内置回退prompt
+        
+        Returns:
+            默认system prompt字符串
+        """
+        try:
+            # 尝试从项目根目录开始查找
+            path = Path(__file__).parent.parent.parent / cls.DEFAULT_PROMPT_FILE
+            if path.exists():
+                content = path.read_text(encoding="utf-8")
+                if content.strip():
+                    return content
+        except (OSError, UnicodeDecodeError):
+            pass
+        
+        # 使用内置回退prompt
+        return cls._FALLBACK_PROMPT
 
     def set_system_prompt(self, prompt: str) -> None:
         """设置System Prompt"""

@@ -49,6 +49,21 @@ class BaseLLMAdapter(ABC):
         self.max_retries = max_retries
         self.temperature = temperature
         self.max_tokens = max_tokens
+    
+    def _mask_api_key(self, key: str) -> str:
+        """API Key脱敏显示
+        
+        用于日志记录，避免泄露完整API Key。
+        
+        Args:
+            key: 原始API Key
+            
+        Returns:
+            脱敏后的API Key，如 "sk-ab...xyz"
+        """
+        if not key or len(key) <= 8:
+            return "***"
+        return f"{key[:4]}...{key[-4:]}"
 
     @abstractmethod
     async def chat(

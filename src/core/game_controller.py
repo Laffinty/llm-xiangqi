@@ -4,6 +4,12 @@
 协调Agent和RefereeEngine的交互，管理游戏流程
 """
 
+"""
+游戏控制器
+
+协调Agent和RefereeEngine的交互，管理游戏流程
+"""
+
 from typing import Optional, Tuple, Dict, Any
 from dataclasses import dataclass
 import asyncio
@@ -15,6 +21,9 @@ from .state_serializer import (
     GameResult,
     MoveResult,
 )
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -61,16 +70,16 @@ class GameController:
             return MoveResult(success=False, error=f"Invalid ICCS format: {iccs_move}")
 
         if not self.referee.validate_move(iccs_move):
-            from ..utils.logger import get_logger
-
-            logger = get_logger("game", level="INFO")
             legal = self.referee.get_legal_moves()
             logger.error(
-                f"DEBUG: agent_name={agent_name}, iccs_move={iccs_move}, current_turn={self.referee.get_current_turn()}, phase={self.phase}"
+                f"DEBUG: agent_name={agent_name}, iccs_move={iccs_move}, "
+                f"current_turn={self.referee.get_current_turn()}, phase={self.phase}"
             )
             return MoveResult(
                 success=False,
-                error=f"Illegal move: {iccs_move}, current_turn={self.referee.get_current_turn()}, legal_moves={legal[:5]}...",
+                error=f"Illegal move: {iccs_move}, "
+                f"current_turn={self.referee.get_current_turn()}, "
+                f"legal_moves={legal[:5]}...",
             )
 
         try:
@@ -213,9 +222,6 @@ class LLMAgentGameController(GameController):
             try:
                 observer(move, fen, is_game_over)
             except Exception as e:
-                from ..utils.logger import get_logger
-
-                logger = get_logger("game", level="ERROR")
                 logger.error(f"Observer notification failed: {e}")
 
     def apply_move(self, agent_name: str, iccs_move: str) -> MoveResult:
@@ -259,10 +265,7 @@ class LLMAgentGameController(GameController):
 
             # 投降检测
             if result.resign or result.move == "jxjx":
-                from ..utils.logger import get_logger
                 from .referee_engine import Color
-
-                logger = get_logger("game", level="INFO")
                 agent_name = self.current_agent.config.name
                 resigner_color = self.current_agent.config.color
                 resigner_color_enum = Color(resigner_color.lower())
@@ -314,9 +317,6 @@ class LLMAgentGameController(GameController):
                     move_result.thought = result.thought
                 return move_result
             else:
-                from ..utils.logger import get_logger
-
-                logger = get_logger("game", level="WARNING")
                 if result.move is None:
                     last_error_msg = "输出格式错误：未能在响应中找到有效的ICCS走步。请严格按照JSON格式输出，包含move字段，值为4字符的ICCS坐标（如h2e2）。"
                     logger.warning(f"LLM返回None (解析失败), attempt {attempt + 1}/3")
@@ -337,9 +337,7 @@ class LLMAgentGameController(GameController):
         Returns:
             游戏结果信息
         """
-        from ..utils.logger import get_logger
 
-        logger = get_logger("game", level="INFO")
 
         if verbose:
             logger.info("=" * 60)

@@ -215,10 +215,53 @@ class RefereeEngine:
         self.check_history: List[bool] = []
 
     def _parse_fen(self, fen: str) -> None:
-        """解析FEN字符串并设置棋盘"""
+        """解析FEN字符串并设置棋盘
+        
+        Args:
+            fen: FEN格式的局面字符串
+            
+        Raises:
+            ValueError: 当FEN格式无效时
+            TypeError: 当fen不是字符串时
+        """
+        # 输入类型验证
+        if not isinstance(fen, str):
+            raise TypeError(f"FEN must be a string, got {type(fen).__name__}")
+        
+        if not fen.strip():
+            raise ValueError("FEN cannot be empty")
+        
         parts = fen.split()
         if len(parts) < 1:
             raise ValueError(f"Invalid FEN: {fen}")
+        
+        # 基础格式验证
+        board_part = parts[0]
+        rows = board_part.split("/")
+        
+        # 验证行数
+        if len(rows) != 10:
+            raise ValueError(f"FEN must have exactly 10 rows, got {len(rows)}: {fen}")
+        
+        # 验证每行列数
+        for i, row in enumerate(rows):
+            col_count = 0
+            for char in row:
+                if char.isdigit():
+                    col_count += int(char)
+                elif char.isalpha():
+                    col_count += 1
+                else:
+                    raise ValueError(f"Invalid character '{char}' in row {i}: {row}")
+            
+            if col_count != 9:
+                raise ValueError(f"Row {i} must have exactly 9 columns, got {col_count}: {row}")
+        
+        # 验证side to move（如果提供）
+        if len(parts) >= 2:
+            side = parts[1]
+            if side not in ('w', 'b'):
+                raise ValueError(f"Side to move must be 'w' or 'b', got '{side}': {fen}")
 
         # 重要：先清空整个棋盘，避免残留棋子导致状态泄漏
         for r in range(10):

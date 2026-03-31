@@ -57,6 +57,7 @@ class ChessGUI:
         self._thread: Optional[threading.Thread] = None
 
         self._lock = threading.RLock()
+        self._queue_lock = threading.Lock()  # 专门的队列锁，保护_move_queue
         self._move_queue: list = []
         self._ready = threading.Event()
         self._init_error: Optional[str] = None
@@ -129,13 +130,16 @@ class ChessGUI:
         is_game_over: bool = False,
     ):
         """更新棋盘状态（线程安全）- fen作为唯一数据源"""
+        # 使用队列锁保护队列操作（快速路径）
         if not self._ready.is_set():
-            self._move_queue.append((move, fen, is_game_over))
+            with self._queue_lock:
+                self._move_queue.append((move, fen, is_game_over))
             return
 
         with self._lock:
             if self.animating_piece:
-                self._move_queue.append((move, fen, is_game_over))
+                with self._queue_lock:
+                    self._move_queue.append((move, fen, is_game_over))
                 return
 
             if is_game_over:
