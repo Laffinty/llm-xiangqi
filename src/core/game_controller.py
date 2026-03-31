@@ -4,12 +4,6 @@
 协调Agent和RefereeEngine的交互，管理游戏流程
 """
 
-"""
-游戏控制器
-
-协调Agent和RefereeEngine的交互，管理游戏流程
-"""
-
 from typing import Optional, Tuple, Dict, Any
 from dataclasses import dataclass
 import asyncio
@@ -42,7 +36,7 @@ class GameEndReasons:
     RESIGNATION_BLACK = "Black resigned"
     # 其他
     MAX_TURNS = "Maximum turns reached"
-    STALEMATE = "Stalement"
+    STALEMATE = "Stalemate"
 
 
 @dataclass

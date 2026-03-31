@@ -44,8 +44,8 @@ class LLMConfig:
 
 
 @dataclass
-class AgentConfig:
-    """Agent配置"""
+class AgentConfigDTO:
+    """Agent配置数据传输对象"""
 
     name: str
     color: str
@@ -219,7 +219,7 @@ class ConfigLoader:
         return cls._resolve_dict_env_vars(config or {})
 
     @classmethod
-    def load_agent_config(cls, path: str) -> AgentConfig:
+    def load_agent_config(cls, path: str) -> AgentConfigDTO:
         """加载Agent配置"""
         data = cls.load_yaml(path)
         llm_data = data.get("llm", {})
@@ -235,7 +235,7 @@ class ConfigLoader:
             timeout=llm_data.get("timeout", 30),
         )
 
-        return AgentConfig(
+        return AgentConfigDTO(
             name=agent_data.get("name", ""),
             color=agent_data.get("color", ""),
             description=agent_data.get("description", ""),
