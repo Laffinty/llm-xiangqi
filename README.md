@@ -117,9 +117,3 @@ npm run dev    # http://localhost:5173
 ```bash
 python -m pytest tests/ -v
 ```
-
----
-
-## License
-
-MIT License - 详见 [LICENSE](LICENSE)
