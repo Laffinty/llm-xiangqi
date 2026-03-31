@@ -102,14 +102,124 @@ llm-xiangqi/
 
 ---
 
-## Web 可视化
+## Web 3D 可视化
+
+### 环境准备
+
+进入前端目录并安装依赖：
 
 ```bash
-cd web_3d_client && npm install
+cd web_3d_client
+npm install
 ```
 
-## Web 3D
+### 编译构建
+
+构建前端静态文件（输出到 `src/web_3d/static/`）：
 
 ```bash
-cd web_3d_client && npm install
+npm run build
+```
+
+### 运行
+
+返回项目根目录，通过 `game.py` 运行（Web 3D 模式）：
+
+```bash
+cd ..
+python game.py
+```
+
+或者使用完整命令：
+
+```bash
+cd web_3d_client && npm install && npm run build && cd .. && python game.py
+```
+
+浏览器将自动打开（默认端口 8080），也可手动访问 http://localhost:8080
+
+### 配置
+
+编辑 `config/game_config.yaml` 调整 Web 3D 设置：
+
+```yaml
+gui:
+  3d: false        # 原生 3D GUI (pyglet)
+  web_3d: true     # Web 3D 可视化
+
+  web_3d_config:
+    host: "0.0.0.0"
+    port: 8080
+    auto_open_browser: true
+```
+
+### 开发模式（可选）
+
+如需前端开发实时热更新：
+
+```bash
+cd web_3d_client
+npm run dev
+```
+
+---
+
+## Web 3D Visualization
+
+### Setup
+
+Install dependencies:
+
+```bash
+cd web_3d_client
+npm install
+```
+
+### Build
+
+Build static files (output to `src/web_3d/static/`):
+
+```bash
+npm run build
+```
+
+### Run
+
+Return to project root and run via `game.py`:
+
+```bash
+cd ..
+python game.py
+```
+
+Or in one command:
+
+```bash
+cd web_3d_client && npm install && npm run build && cd .. && python game.py
+```
+
+Browser will auto-open (default port 8080), or manually visit http://localhost:8080
+
+### Configuration
+
+Edit `config/game_config.yaml` to adjust Web 3D settings:
+
+```yaml
+gui:
+  3d: false        # Native 3D GUI (pyglet)
+  web_3d: true     # Web 3D visualization
+
+  web_3d_config:
+    host: "0.0.0.0"
+    port: 8080
+    auto_open_browser: true
+```
+
+### Development Mode (Optional)
+
+For frontend hot-reload development:
+
+```bash
+cd web_3d_client
+npm run dev
 ```
