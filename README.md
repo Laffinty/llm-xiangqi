@@ -8,14 +8,14 @@ LLM Agent Chinese Chess Battle Framework
 
 ## 特性
 
-- **多模型支持** - DeepSeek、MiMo、MiniMax 适配器
+- **多模型支持** - DeepSeek、MiMo、MiniMax 等 LLM 适配器，可扩展任意模型
 - **完整规则引擎** - 完整中国象棋规则实现
 - **3D 可视化** - Web Three.js 可视化界面
 - **MCP 工具** - 可扩展工具系统
 
 ## Features
 
-- **Multi-LLM Support** - DeepSeek, MiMo, MiniMax adapters
+- **Multi-LLM Support** - DeepSeek, MiMo, MiniMax and other LLM adapters, extensible to any model
 - **Complete Rule Engine** - Full Chinese chess rules
 - **3D Visualization** - Web Three.js visualization
 - **MCP Tools** - Extensible tool system
@@ -30,11 +30,11 @@ LLM Agent Chinese Chess Battle Framework
 pip install -r requirements.txt
 ```
 
-### 2. 安装并构建 Web 前端 / Setup Web Frontend
+### 2. 构建 Web 3D 前端 / Build Web 3D Frontend
 
-项目使用 Web 3D 可视化作为默认界面，需要 Node.js 环境（建议 v18+）。
+默认使用 Web 3D 可视化界面，需要 Node.js 环境（建议 v18+）：
 
-The project uses Web 3D visualization as the default interface, requiring Node.js (v18+ recommended).
+Web 3D visualization is the default interface, requiring Node.js (v18+ recommended):
 
 ```bash
 cd web_3d_client
@@ -56,44 +56,15 @@ $env:DEEPSEEK_API_KEY="sk-xxx"
 set DEEPSEEK_API_KEY=sk-xxx
 ```
 
-### 4. 运行对战 / Run Battle
+### 4. 运行 / Run
 
 ```bash
 python game.py
 ```
 
-程序将自动打开浏览器访问 `http://localhost:8080` 查看 3D 可视化界面。
+程序将启动 Web 3D 服务并自动打开浏览器（默认 `http://localhost:8080`）。
 
-The browser will automatically open at `http://localhost:8080` for the 3D visualization.
-
----
-
-## 完整部署示例 / Full Deployment Example
-
-全新电脑从零部署：
-
-Fresh deployment from scratch:
-
-```bash
-# 1. 获取代码 / Get the code
-git clone <repository-url>
-cd llm-xiangqi
-
-# 2. Python 依赖 / Python dependencies
-pip install -r requirements.txt
-
-# 3. 前端构建 / Frontend build
-cd web_3d_client
-npm install
-npm run build
-cd ..
-
-# 4. 设置 API 密钥 / Set API key
-export DEEPSEEK_API_KEY="sk-xxx"  # 或使用其他适配器 / or use other adapters
-
-# 5. 运行 / Run
-python game.py
-```
+The Web 3D server starts and browser opens automatically (default `http://localhost:8080`).
 
 ---
 
@@ -106,11 +77,10 @@ llm-xiangqi/
 ├── src/
 │   ├── agents/       # Agent 实现 / Agent implementations
 │   ├── core/         # 规则引擎 / Rule engine
-│   ├── gui/          # 原生 GUI (可选) / Native GUI (optional)
-│   ├── llm_adapters/ # 模型适配器 / LLM adapters
+│   ├── llm_adapters/ # 模型适配器（可扩展）/ LLM adapters (extensible)
 │   ├── mcp_tools/    # MCP 工具 / MCP tools
-│   └── web_3d/       # Web 服务 / Web server
-├── web_3d_client/    # Web 前端 / Web frontend
+│   └── web_3d/       # Web 3D 服务 / Web 3D server
+├── web_3d_client/    # Web 3D 前端 / Web 3D frontend
 ├── tests/            # 单元测试 / Unit tests
 ├── game.py           # 主入口 / Main entry
 └── main.py           # 演示入口 / Demo entry
@@ -118,51 +88,33 @@ llm-xiangqi/
 
 ---
 
-## 配置说明 / Configuration
+## 配置 / Configuration
 
-编辑 `config/game_config.yaml` 调整设置：
+编辑 `config/game_config.yaml`：
 
-Edit `config/game_config.yaml` to adjust settings:
+Edit `config/game_config.yaml`:
 
 ```yaml
-# Web 3D 服务配置 / Web 3D server config
-web_3d_config:
-  host: "0.0.0.0"
-  port: 8080
-  auto_open_browser: true  # 自动打开浏览器 / Auto open browser
-
-# Agent 配置在 / Agent configs in:
-# - config/agent1_config.yaml
-# - config/agent2_config.yaml
+gui:
+  web_3d: true               # 启用 Web 3D / Enable Web 3D
+  web_3d_config:
+    port: 8080               # 服务端口 / Server port
+    auto_open_browser: true  # 自动打开浏览器 / Auto open browser
 ```
 
 ---
 
-## 开发模式 / Development Mode
+## 添加新模型 / Add New Model
 
-如需前端开发热更新 / For frontend hot-reload development:
+在 `src/llm_adapters/` 创建适配器，继承 `BaseLLMAdapter`：
 
-```bash
-cd web_3d_client
-npm run dev
+Create an adapter in `src/llm_adapters/` inheriting from `BaseLLMAdapter`:
+
+```python
+from src.llm_adapters.base_adapter import BaseLLMAdapter
+
+class MyAdapter(BaseLLMAdapter):
+    async def chat(self, prompt: str) -> str:
+        # 实现模型调用 / Implement model call
+        pass
 ```
-
-然后另开终端运行 / Then run in another terminal:
-
-```bash
-python game.py
-```
-
----
-
-## 支持的模型 / Supported Models
-
-| 提供商 / Provider | 配置项 / Config Key | 说明 / Notes |
-|------------------|--------------------|--------------|
-| DeepSeek | `deepseek` | 默认推荐 / Recommended |
-| MiMo | `mimo` | 小米 AI |
-| MiniMax | `minimax` | MiniMax API |
-
-在 `config/agent*.yaml` 中修改 `provider` 切换模型。
-
-Change `provider` in `config/agent*.yaml` to switch models.
