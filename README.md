@@ -10,216 +10,159 @@ LLM Agent Chinese Chess Battle Framework
 
 - **多模型支持** - DeepSeek、MiMo、MiniMax 适配器
 - **完整规则引擎** - 完整中国象棋规则实现
-- **3D 可视化** - 原生 pyglet GUI + Web Three.js
+- **3D 可视化** - Web Three.js 可视化界面
 - **MCP 工具** - 可扩展工具系统
 
 ## Features
 
 - **Multi-LLM Support** - DeepSeek, MiMo, MiniMax adapters
 - **Complete Rule Engine** - Full Chinese chess rules
-- **3D Visualization** - Native pyglet GUI + Web Three.js
+- **3D Visualization** - Web Three.js visualization
 - **MCP Tools** - Extensible tool system
 
 ---
 
-## 快速开始
+## 快速开始 / Quick Start
+
+### 1. 安装 Python 依赖 / Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-设置 API 密钥：
+### 2. 安装并构建 Web 前端 / Setup Web Frontend
 
-```bash
-export DEEPSEEK_API_KEY="sk-xxx"  # Linux/macOS
-$env:DEEPSEEK_API_KEY="sk-xxx"    # Windows PowerShell
-```
+项目使用 Web 3D 可视化作为默认界面，需要 Node.js 环境（建议 v18+）。
 
-运行对战：
-
-```bash
-python game.py
-```
-
-## Quick Start
-
-```bash
-pip install -r requirements.txt
-```
-
-Set API key:
-
-```bash
-export DEEPSEEK_API_KEY="sk-xxx"  # Linux/macOS
-$env:DEEPSEEK_API_KEY="sk-xxx"    # Windows PowerShell
-```
-
-Run battle:
-
-```bash
-python game.py
-```
-
----
-
-## 项目结构
-
-```
-llm-xiangqi/
-├── config/           # 配置文件
-├── prompts/          # 系统提示词
-├── src/
-│   ├── agents/       # Agent 实现
-│   ├── core/         # 规则引擎
-│   ├── gui/          # 原生 3D GUI
-│   ├── llm_adapters/ # 模型适配器
-│   ├── mcp_tools/    # MCP 工具
-│   └── web_3d/       # Web 服务
-├── web_3d_client/    # Web 前端
-├── tests/            # 单元测试
-├── game.py           # 主入口
-└── main.py           # 演示入口
-```
-
-## Project Structure
-
-```
-llm-xiangqi/
-├── config/           # Configurations
-├── prompts/          # System prompts
-├── src/
-│   ├── agents/       # Agent implementations
-│   ├── core/         # Rule engine
-│   ├── gui/          # Native 3D GUI
-│   ├── llm_adapters/ # LLM adapters
-│   ├── mcp_tools/    # MCP tools
-│   └── web_3d/       # Web server
-├── web_3d_client/    # Web frontend
-├── tests/            # Unit tests
-├── game.py           # Main entry
-└── main.py           # Demo entry
-```
-
----
-
-## Web 3D 可视化
-
-### 环境准备
-
-进入前端目录并安装依赖：
+The project uses Web 3D visualization as the default interface, requiring Node.js (v18+ recommended).
 
 ```bash
 cd web_3d_client
 npm install
-```
-
-### 编译构建
-
-构建前端静态文件（输出到 `src/web_3d/static/`）：
-
-```bash
 npm run build
+cd ..
 ```
 
-### 运行
-
-返回项目根目录，通过 `game.py` 运行（Web 3D 模式）：
+### 3. 配置 API 密钥 / Configure API Key
 
 ```bash
-cd ..
+# Linux/macOS
+export DEEPSEEK_API_KEY="sk-xxx"
+
+# Windows PowerShell
+$env:DEEPSEEK_API_KEY="sk-xxx"
+
+# Windows CMD
+set DEEPSEEK_API_KEY=sk-xxx
+```
+
+### 4. 运行对战 / Run Battle
+
+```bash
 python game.py
 ```
 
-或者使用完整命令：
+程序将自动打开浏览器访问 `http://localhost:8080` 查看 3D 可视化界面。
+
+The browser will automatically open at `http://localhost:8080` for the 3D visualization.
+
+---
+
+## 完整部署示例 / Full Deployment Example
+
+全新电脑从零部署：
+
+Fresh deployment from scratch:
 
 ```bash
-cd web_3d_client && npm install && npm run build && cd .. && python game.py
+# 1. 获取代码 / Get the code
+git clone <repository-url>
+cd llm-xiangqi
+
+# 2. Python 依赖 / Python dependencies
+pip install -r requirements.txt
+
+# 3. 前端构建 / Frontend build
+cd web_3d_client
+npm install
+npm run build
+cd ..
+
+# 4. 设置 API 密钥 / Set API key
+export DEEPSEEK_API_KEY="sk-xxx"  # 或使用其他适配器 / or use other adapters
+
+# 5. 运行 / Run
+python game.py
 ```
 
-浏览器将自动打开（默认端口 8080），也可手动访问 http://localhost:8080
+---
 
-### 配置
+## 项目结构 / Project Structure
 
-编辑 `config/game_config.yaml` 调整 Web 3D 设置：
+```
+llm-xiangqi/
+├── config/           # 配置文件 / Configurations
+├── prompts/          # 系统提示词 / System prompts
+├── src/
+│   ├── agents/       # Agent 实现 / Agent implementations
+│   ├── core/         # 规则引擎 / Rule engine
+│   ├── gui/          # 原生 GUI (可选) / Native GUI (optional)
+│   ├── llm_adapters/ # 模型适配器 / LLM adapters
+│   ├── mcp_tools/    # MCP 工具 / MCP tools
+│   └── web_3d/       # Web 服务 / Web server
+├── web_3d_client/    # Web 前端 / Web frontend
+├── tests/            # 单元测试 / Unit tests
+├── game.py           # 主入口 / Main entry
+└── main.py           # 演示入口 / Demo entry
+```
+
+---
+
+## 配置说明 / Configuration
+
+编辑 `config/game_config.yaml` 调整设置：
+
+Edit `config/game_config.yaml` to adjust settings:
 
 ```yaml
-gui:
-  3d: false        # 原生 3D GUI (pyglet)
-  web_3d: true     # Web 3D 可视化
+# Web 3D 服务配置 / Web 3D server config
+web_3d_config:
+  host: "0.0.0.0"
+  port: 8080
+  auto_open_browser: true  # 自动打开浏览器 / Auto open browser
 
-  web_3d_config:
-    host: "0.0.0.0"
-    port: 8080
-    auto_open_browser: true
+# Agent 配置在 / Agent configs in:
+# - config/agent1_config.yaml
+# - config/agent2_config.yaml
 ```
 
-### 开发模式（可选）
+---
 
-如需前端开发实时热更新：
+## 开发模式 / Development Mode
+
+如需前端开发热更新 / For frontend hot-reload development:
 
 ```bash
 cd web_3d_client
 npm run dev
 ```
 
----
-
-## Web 3D Visualization
-
-### Setup
-
-Install dependencies:
+然后另开终端运行 / Then run in another terminal:
 
 ```bash
-cd web_3d_client
-npm install
-```
-
-### Build
-
-Build static files (output to `src/web_3d/static/`):
-
-```bash
-npm run build
-```
-
-### Run
-
-Return to project root and run via `game.py`:
-
-```bash
-cd ..
 python game.py
 ```
 
-Or in one command:
+---
 
-```bash
-cd web_3d_client && npm install && npm run build && cd .. && python game.py
-```
+## 支持的模型 / Supported Models
 
-Browser will auto-open (default port 8080), or manually visit http://localhost:8080
+| 提供商 / Provider | 配置项 / Config Key | 说明 / Notes |
+|------------------|--------------------|--------------|
+| DeepSeek | `deepseek` | 默认推荐 / Recommended |
+| MiMo | `mimo` | 小米 AI |
+| MiniMax | `minimax` | MiniMax API |
 
-### Configuration
+在 `config/agent*.yaml` 中修改 `provider` 切换模型。
 
-Edit `config/game_config.yaml` to adjust Web 3D settings:
-
-```yaml
-gui:
-  3d: false        # Native 3D GUI (pyglet)
-  web_3d: true     # Web 3D visualization
-
-  web_3d_config:
-    host: "0.0.0.0"
-    port: 8080
-    auto_open_browser: true
-```
-
-### Development Mode (Optional)
-
-For frontend hot-reload development:
-
-```bash
-cd web_3d_client
-npm run dev
-```
+Change `provider` in `config/agent*.yaml` to switch models.
