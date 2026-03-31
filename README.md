@@ -1,30 +1,34 @@
-# LLM-Xiangqi / 中国象棋 LLM 对战框架
+# LLM-Xiangqi / 中国象棋 LLM 对战平台
 
-基于 LLM Agent 的中国象棋对战框架，支持多种 LLM 提供者（DeepSeek、MiniMax、MiMo 等）。内置完整的象棋规则引擎、3D 可视化界面以及灵活的多 Agent 对战架构。
+**English** | 一个基于 LLM Agent 的中国象棋对战框架，支持多模型对战、完整规则引擎、3D 可视化。
 
----
-
-## 特性
-
-- **模块化 Agent 架构**：统一的 `LLMAgent` 类 + 可插拔适配器
-- **双协议支持**：OpenAI 兼容 + Anthropic 兼容协议
-- **完整的规则引擎**：棋子移动验证、将军/应将检测、胜负判定
-- **3D 可视化**：pyglet/OpenGL 原生界面 + Three.js Web 界面
-- **MCP Tools**：支持通过 MCP 协议扩展 Agent 工具能力
+**中文** | A Chinese chess battle framework based on LLM Agent, supporting multi-model battles, complete rule engine, and 3D visualization.
 
 ---
 
-## 快速开始
+## Features / 特性
 
-### 1. 安装依赖
+| English | 中文 |
+|---------|------|
+| **Multi-Provider Support** - DeepSeek, MiniMax, MiMo adapters with unified interface | **多提供商支持** - DeepSeek、MiniMax、MiMo 适配器，统一接口 |
+| **Dual Protocol** - OpenAI-compatible & Anthropic-compatible APIs | **双协议支持** - OpenAI 兼容与 Anthropic 兼容 API |
+| **Complete Rule Engine** - Move validation, check/checkmate detection, game-over judgment | **完整规则引擎** - 走法验证、将军检测、胜负判定 |
+| **3D Visualization** - Native pyglet GUI + Three.js Web interface | **3D 可视化** - 原生 pyglet GUI + Three.js Web 界面 |
+| **MCP Tools** - Extensible tool system via MCP protocol | **MCP 工具** - 通过 MCP 协议扩展工具能力 |
+
+---
+
+## Quick Start / 快速开始
+
+### 1. Install Dependencies / 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API Keys
+### 2. Configure API Keys / 配置 API 密钥
 
-**推荐：使用环境变量**
+**Environment Variables / 环境变量**
 
 ```bash
 # Linux/macOS
@@ -35,63 +39,57 @@ export MIMO_API_KEY="sk-your-key"
 $env:DEEPSEEK_API_KEY="sk-your-key"
 ```
 
-**或：编辑配置文件**
+**Or edit config files / 或编辑配置文件**: `config/agent1_config.yaml`, `config/agent2_config.yaml`
 
-修改 `config/agent1_config.yaml` 和 `config/agent2_config.yaml`：
-
-```yaml
-llm:
-  provider: "deepseek"
-  api_key: "${DEEPSEEK_API_KEY}"  # 或直接使用 "sk-your-key"
-```
-
-### 3. 运行对战
+### 3. Run Battle / 运行对战
 
 ```bash
-python game.py              # 默认对战
-python game.py --turns 200  # 指定最大回合数
+# Console mode / 控制台模式
+python game.py
+
+# With Web 3D visualization / Web 3D 可视化模式
+# Edit config/game_config.yaml: web_3d: true
+python game.py
+
+# Demo mode / 演示模式
+python main.py --mode demo
 ```
 
 ---
 
-## 支持的 LLM 提供商
+## Supported Providers / 支持的模型
 
-| Provider | Adapter | Protocol | Default Model |
-|----------|---------|----------|---------------|
-| `deepseek` | `DeepSeekAdapter` | OpenAI | `deepseek-chat` |
-| `mimo` | `MiMoAdapter` | OpenAI | `mimo-v2-pro` |
-| `minimax` | `MiniMaxAdapter` | Anthropic | `MiniMax-M2.7` |
-
-接入新 LLM 只需继承 `OpenAICompatibleAdapter` 或 `AnthropicCompatibleAdapter`，详见 [API 文档](docs/api-standard.md)。
+| Provider | Protocol | Default Model |
+|----------|----------|---------------|
+| DeepSeek | OpenAI | `deepseek-chat` |
+| MiMo | OpenAI | `mimo-v2-pro` |
+| MiniMax | Anthropic | `MiniMax-M2.7` |
 
 ---
 
-## 项目结构
+## Project Structure / 项目结构
 
 ```
 llm-xiangqi/
-├── config/              # 配置文件（Agent、游戏设置）
-├── prompts/             # System prompts
+├── config/              # Agent & game configs / 配置文件
+├── prompts/             # System prompts / 系统提示词
 ├── src/
-│   ├── agents/          # Agent 实现
-│   ├── core/            # 核心引擎（裁判、控制器）
-│   ├── gui/             # 3D 可视化（pyglet）
-│   ├── llm_adapters/    # LLM 适配器
-│   └── web_3d/          # Web 3D 服务器
-├── web_3d_client/       # Web 3D 前端（Three.js）
-├── docs/
-│   ├── api-standard.md  # API 详细文档
-│   ├── CODE_REVIEW_REPORT.md    # 代码审查报告
-│   ├── OPTIMIZATION_PLAN.md     # 优化计划
-│   └── FIXES_APPLIED.md         # 修复记录
-├── tests/               # 单元测试
-├── game.py              # 对战入口
-└── main.py              # 演示入口
+│   ├── agents/          # Agent implementations / Agent 实现
+│   ├── core/            # Rule engine & controller / 核心引擎
+│   ├── gui/             # Native 3D GUI / 原生 3D 界面
+│   ├── llm_adapters/    # LLM provider adapters / 模型适配器
+│   ├── mcp_tools/       # MCP tool system / MCP 工具系统
+│   ├── utils/           # Utilities / 工具函数
+│   └── web_3d/          # Web 3D server / Web 3D 服务器
+├── web_3d_client/       # Three.js frontend / Web 前端
+├── tests/               # Unit tests / 单元测试
+├── game.py              # Battle entry / 对战入口
+└── main.py              # Demo entry / 演示入口
 ```
 
 ---
 
-## Web 3D 可视化
+## Web 3D Visualization / Web 3D 可视化
 
 ```bash
 cd web_3d_client
@@ -101,19 +99,14 @@ npm run dev    # http://localhost:5173
 
 ---
 
-## 文档
-
-| 文档 | 说明 |
-|------|------|
-| [api-standard.md](docs/api-standard.md) | API 规范、数据结构、接入指南 |
-| [CODE_REVIEW_REPORT.md](docs/CODE_REVIEW_REPORT.md) | 代码审查报告 |
-| [OPTIMIZATION_PLAN.md](docs/OPTIMIZATION_PLAN.md) | 优化路线图 |
-| [FIXES_APPLIED.md](docs/FIXES_APPLIED.md) | 已应用的修复 |
-
----
-
-## 测试
+## Testing / 测试
 
 ```bash
 python -m pytest tests/ -v
 ```
+
+---
+
+## Documentation / 文档
+
+- [docs/api-standard.md](docs/api-standard.md) - API specification / API 规范
