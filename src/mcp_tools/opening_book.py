@@ -55,7 +55,11 @@ class OpeningBookTool(BaseTool):
         }
 
     def load_book(self, path: Optional[str] = None) -> bool:
-        """加载开局库数据文件"""
+        """加载开局库数据文件
+
+        Returns:
+            True if loaded successfully, False if loading failed
+        """
         if path is None:
             self._loaded = True
             return True
@@ -70,9 +74,9 @@ class OpeningBookTool(BaseTool):
                 self._book_data = json.load(f)
             self._loaded = True
             return True
-        except Exception:
-            self._loaded = True
-            return True
+        except (json.JSONDecodeError, OSError) as e:
+            self._loaded = False
+            return False
 
     async def execute(self, **kwargs) -> ToolResult:
         """执行开局库查询"""

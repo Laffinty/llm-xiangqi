@@ -14,12 +14,14 @@ from pathlib import Path
 # 类型定义
 class AnnotatedMoveDict(TypedDict):
     """带标注的走步字典"""
+
     move: str
     annotations: List[str]
 
 
 class GameStateDict(TypedDict, total=False):
     """游戏状态字典类型"""
+
     turn: Literal["Red", "Black"]
     fen: str
     ascii_board: str
@@ -39,59 +41,59 @@ class GameStateDict(TypedDict, total=False):
 
 class PromptBuilder:
     """Prompt构建器
-    
+
     支持从文件或字符串加载system prompt，提供向后兼容的无参构造函数。
-    
+
     Examples:
         >>> # 从字符串创建（推荐）
         >>> builder = PromptBuilder("你是一位象棋大师...")
-        >>> 
+        >>>
         >>> # 从文件创建（推荐）
         >>> builder = PromptBuilder.from_file("prompts/agent_default.txt")
-        >>> 
+        >>>
         >>> # 无参创建（向后兼容，加载默认prompt）
         >>> builder = PromptBuilder()
     """
-    
+
     DEFAULT_PROMPT_FILE = "prompts/agent_default.txt"
     _FALLBACK_PROMPT = (
         "你是中国象棋AI助手。根据当前局面选择最优走步。"
-        "必须输出JSON格式: {\"thought\": \"你的分析\", \"move\": \"h2e2\"}"
+        '必须输出JSON格式: {"thought": "你的分析", "move": "h2e2"}'
     )
 
     def __init__(self, system_prompt: Optional[str] = None):
         """
         初始化PromptBuilder
-        
+
         Args:
             system_prompt: System prompt字符串。若为None，则加载默认prompt文件。
-        
+
         Raises:
             ValueError: 当system_prompt为空字符串或默认prompt文件不存在时
         """
         if system_prompt is None:
             system_prompt = self._load_default_prompt()
-        
+
         if not system_prompt or not system_prompt.strip():
             raise ValueError(
                 "system_prompt is required and cannot be empty. "
                 f"Ensure {self.DEFAULT_PROMPT_FILE} exists or provide a valid prompt."
             )
-        
+
         self.system_prompt = system_prompt
         self.history: List[Dict[str, str]] = []
         self.tool_results: List[Dict[str, Any]] = []
-        self.tools: List[Dict[str, Any]] = MCP_TOOLS
-    
+        self.tools: List[Dict[str, Any]] = list(MCP_TOOLS)
+
     @classmethod
     def _load_default_prompt(cls) -> str:
         """
         加载默认system prompt
-        
+
         按优先级尝试：
         1. DEFAULT_PROMPT_FILE 文件内容
         2. _FALLBACK_PROMPT 内置回退prompt
-        
+
         Returns:
             默认system prompt字符串
         """
@@ -104,7 +106,7 @@ class PromptBuilder:
                     return content
         except (OSError, UnicodeDecodeError):
             pass
-        
+
         # 使用内置回退prompt
         return cls._FALLBACK_PROMPT
 
@@ -214,31 +216,28 @@ class PromptBuilder:
             lines.append(f"## 合法走步 (共 {len(annotated_moves)} 种)")
 
             # 按标注类型分组（新增战术组和位置组）
-            tactical = []       # 战术组合：捉双、牵制、弃子
-            positional = []     # 战略位置：过河、占中、占肋
+            tactical = []  # 战术组合：捉双、牵制、弃子
+            positional = []  # 战略位置：过河、占中、占肋
             check_capture = []  # 将军/吃子
-            development = []    # 出子
-            repetition = []     # 重复警告
-            other = []          # 其他
+            development = []  # 出子
+            repetition = []  # 重复警告
+            other = []  # 其他
 
             for entry in annotated_moves:
                 move_str = entry["move"]
                 anns = entry.get("annotations", [])
-                
+
                 # 分类判断
                 is_tactical = any(
-                    a in ["pin"] or a.startswith(("fork:", "sacrifice:"))
-                    for a in anns
+                    a in ["pin"] or a.startswith(("fork:", "sacrifice:")) for a in anns
                 )
                 is_positional = any(
-                    a in ["cross_river", "central_file", "flank"]
-                    for a in anns
+                    a in ["cross_river", "central_file", "flank"] for a in anns
                 )
                 is_check_capture = any(
-                    a in ["check"] or a.startswith("capture:")
-                    for a in anns
+                    a in ["check"] or a.startswith("capture:") for a in anns
                 )
-                
+
                 if not anns:
                     other.append(move_str)
                 elif "repetition_warning" in anns:
@@ -259,9 +258,7 @@ class PromptBuilder:
                 elif is_check_capture:
                     # 将军/吃子组
                     label_parts = [self._format_annotation(a) for a in anns]
-                    check_capture.append(
-                        f"{move_str} ({', '.join(label_parts)})"
-                    )
+                    check_capture.append(f"{move_str} ({', '.join(label_parts)})")
                 else:
                     # 混合标注放入其他
                     label_parts = [self._format_annotation(a) for a in anns]

@@ -10,6 +10,9 @@ import subprocess
 from pathlib import Path
 
 from .base_tool import BaseTool, ToolResult
+from ..utils.logger import get_logger
+
+logger = get_logger("mcp_tools.evaluate_position")
 
 
 class EvaluatePositionTool(BaseTool):
@@ -114,6 +117,10 @@ class EvaluatePositionTool(BaseTool):
         )
 
         output = stdout.decode("utf-8", errors="ignore")
+        stderr_output = stderr.decode("utf-8", errors="ignore")
+
+        if stderr_output.strip():
+            logger.debug(f"Engine stderr: {stderr_output[:500]}")
 
         return self._parse_engine_output(fen, depth, output)
 

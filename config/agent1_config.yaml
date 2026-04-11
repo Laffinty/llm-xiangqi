@@ -12,7 +12,7 @@ agent:
 llm:
   provider: "deepseek"
   model: "deepseek-chat"
-  api_key: "${DEEPSEEK_API_KEY}"  # 通过环境变量获取，或替换为你的API Key
+  api_key: "${DEEPSEEK_API_KEY}"
   base_url: "https://api.deepseek.com"
   temperature: 0.7
   max_tokens: 2048

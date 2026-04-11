@@ -23,9 +23,7 @@ INITIAL_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - -
 
 # FEN格式验证正则表达式
 # 格式: 棋盘部分 + 空格 + 行棋方(w/b) + 其余可选字段
-FEN_PATTERN = re.compile(
-    r'^[rnbakabnrpcRNBAKABNRPC1-9/]+ [wb](?: - - \d+ \d+)?$'
-)
+FEN_PATTERN = re.compile(r"^[rnbakabnrpcRNBAKABNRPC1-9/]+ [wb](?: - - \d+ \d+)?$")
 
 # 中国象棋FEN最大长度（安全限制）
 MAX_FEN_LENGTH = 200
@@ -229,10 +227,10 @@ class RefereeEngine:
 
     def _validate_fen_format(self, fen: str) -> None:
         """验证FEN字符串的基本格式
-        
+
         Args:
             fen: FEN格式的局面字符串
-            
+
         Raises:
             TypeError: 当fen不是字符串时
             ValueError: 当FEN格式无效时
@@ -240,43 +238,45 @@ class RefereeEngine:
         # 输入类型验证
         if not isinstance(fen, str):
             raise TypeError(f"FEN must be a string, got {type(fen).__name__}")
-        
+
         if not fen.strip():
             raise ValueError("FEN cannot be empty")
-        
+
         # 长度验证（防止异常输入）
         if len(fen) > MAX_FEN_LENGTH:
-            raise ValueError(f"FEN string too long (max {MAX_FEN_LENGTH}): {len(fen)} chars")
-        
+            raise ValueError(
+                f"FEN string too long (max {MAX_FEN_LENGTH}): {len(fen)} chars"
+            )
+
         # 基础格式验证（使用正则）
         if not FEN_PATTERN.match(fen):
             raise ValueError(f"Invalid FEN format: {fen[:50]}...")
-    
+
     def _parse_fen(self, fen: str) -> None:
         """解析FEN字符串并设置棋盘
-        
+
         Args:
             fen: FEN格式的局面字符串
-            
+
         Raises:
             ValueError: 当FEN格式无效时
             TypeError: 当fen不是字符串时
         """
         # 基础格式验证
         self._validate_fen_format(fen)
-        
+
         parts = fen.split()
         if len(parts) < 1:
             raise ValueError(f"Invalid FEN: {fen}")
-        
+
         # 基础格式验证
         board_part = parts[0]
         rows = board_part.split("/")
-        
+
         # 验证行数
         if len(rows) != 10:
             raise ValueError(f"FEN must have exactly 10 rows, got {len(rows)}: {fen}")
-        
+
         # 验证每行列数
         for i, row in enumerate(rows):
             col_count = 0
@@ -287,26 +287,26 @@ class RefereeEngine:
                     col_count += 1
                 else:
                     raise ValueError(f"Invalid character '{char}' in row {i}: {row}")
-            
+
             if col_count != 9:
-                raise ValueError(f"Row {i} must have exactly 9 columns, got {col_count}: {row}")
-        
+                raise ValueError(
+                    f"Row {i} must have exactly 9 columns, got {col_count}: {row}"
+                )
+
         # 验证side to move（如果提供）
         if len(parts) >= 2:
             side = parts[1]
-            if side not in ('w', 'b'):
-                raise ValueError(f"Side to move must be 'w' or 'b', got '{side}': {fen}")
+            if side not in ("w", "b"):
+                raise ValueError(
+                    f"Side to move must be 'w' or 'b', got '{side}': {fen}"
+                )
 
         # 重要：先清空整个棋盘，避免残留棋子导致状态泄漏
         for r in range(10):
             for c in range(9):
                 self.board.grid[r][c] = None
 
-        # 解析棋盘位置
-        rows = parts[0].split("/")
-        if len(rows) != 10:
-            raise ValueError(f"FEN must have 10 rows, got {len(rows)}")
-
+        # 解析棋盘位置（行数已在上面验证）
         for r, row_str in enumerate(rows):
             c = 0
             for char in row_str:
@@ -383,10 +383,12 @@ class RefereeEngine:
                         move = Move(pos, target)
                         if self._is_move_legal(move, piece):
                             annotations = self._annotate_move(move, piece)
-                            annotated.append({
-                                "move": move.to_iccs(),
-                                "annotations": annotations,
-                            })
+                            annotated.append(
+                                {
+                                    "move": move.to_iccs(),
+                                    "annotations": annotations,
+                                }
+                            )
         return annotated
 
     def _annotate_move(self, move: Move, piece: Piece) -> List[str]:
@@ -413,14 +415,28 @@ class RefereeEngine:
 
         # 2. 出子标记（无需模拟走步）
         if piece.piece_type == PieceType.ROOK:
-            if (piece.color == Color.RED and move.from_pos.row == 0 and move.to_pos.row > 0) or \
-               (piece.color == Color.BLACK and move.from_pos.row == 9 and move.to_pos.row < 9):
+            if (
+                piece.color == Color.RED
+                and move.from_pos.row == 0
+                and move.to_pos.row > 0
+            ) or (
+                piece.color == Color.BLACK
+                and move.from_pos.row == 9
+                and move.to_pos.row < 9
+            ):
                 annotations.append("development")
 
         # 3. 过河检测（兵卒进入对方区域）
         if piece.piece_type == PieceType.PAWN:
-            if (piece.color == Color.RED and move.from_pos.row < 5 and move.to_pos.row >= 5) or \
-               (piece.color == Color.BLACK and move.from_pos.row > 4 and move.to_pos.row <= 4):
+            if (
+                piece.color == Color.RED
+                and move.from_pos.row < 5
+                and move.to_pos.row >= 5
+            ) or (
+                piece.color == Color.BLACK
+                and move.from_pos.row > 4
+                and move.to_pos.row <= 4
+            ):
                 annotations.append("cross_river")
 
         # 4. 占中检测（车/炮走到中路e列）
@@ -438,41 +454,35 @@ class RefereeEngine:
         saved_to = self.board.get_piece(move.to_pos)
         self.board.set_piece(move.to_pos, piece)
 
-        # 将军检测：走步后对方王是否被将军
-        if self.is_king_in_check(piece.color.opposite()):
-            annotations.append("check")
+        try:
+            if self.is_king_in_check(piece.color.opposite()):
+                annotations.append("check")
 
-        # 重复警告：模拟走后局面在 history 中已出现≥2次
-        # 将军时不标重复警告，避免误导 LLM 避免唯一正确的将军走步
-        temp_fen = self.to_fen()
-        if self.position_history.count(temp_fen) >= 2:
-            if "check" not in annotations:
-                annotations.append("repetition_warning")
+            temp_fen = self.to_fen()
+            if self.position_history.count(temp_fen) >= 2:
+                if "check" not in annotations:
+                    annotations.append("repetition_warning")
 
-        # 牵制检测：走步后是否形成牵制
-        pin_result = self._detect_pin(move, piece)
-        if pin_result:
-            annotations.append("pin")
+            pin_result = self._detect_pin(move, piece)
+            if pin_result:
+                annotations.append("pin")
 
-        # 捉双检测：走步后是否同时攻击对方多个棋子
-        fork_target = self._detect_fork(move, piece)
-        if fork_target:
-            annotations.append(f"fork:{fork_target}")
+            fork_target = self._detect_fork(move, piece)
+            if fork_target:
+                annotations.append(f"fork:{fork_target}")
 
-        # 弃子检测：是否主动送吃大子
-        sacrifice = self._detect_sacrifice(move, piece, saved_from)
-        if sacrifice:
-            annotations.append(f"sacrifice:{sacrifice}")
-
-        # 恢复棋盘状态
-        self.board.set_piece(move.from_pos, saved_from)
-        self.board.set_piece(move.to_pos, saved_to)
+            sacrifice = self._detect_sacrifice(move, piece, saved_from)
+            if sacrifice:
+                annotations.append(f"sacrifice:{sacrifice}")
+        finally:
+            self.board.set_piece(move.from_pos, saved_from)
+            self.board.set_piece(move.to_pos, saved_to)
 
         return annotations
 
     def _detect_pin(self, move: Move, piece: Piece) -> bool:
         """检测是否形成牵制
-        
+
         牵制定义：当对方某个棋子的移动会暴露其将帅给将军时，该棋子被牵制。
         检测方式：检查走步后，是否有对方棋子因为保护将帅而不能移动。
         """
@@ -480,7 +490,7 @@ class RefereeEngine:
         enemy_king_pos = self._find_king_position(enemy_color)
         if not enemy_king_pos:
             return False
-        
+
         # 检查是否有对方棋子位于将帅和当前攻击位置之间
         # 简化：检查是否有对方棋子被"钉"在将帅方向上
         for r in range(10):
@@ -492,62 +502,70 @@ class RefereeEngine:
                         return True
         return False
 
-    def _is_defending_king(self, pos: Position, piece: Piece, king_pos: Position) -> bool:
+    def _is_defending_king(
+        self, pos: Position, piece: Piece, king_pos: Position
+    ) -> bool:
         """检查棋子是否在保护将帅（移动会导致将帅被将军）"""
-        # 暂时移除该棋子
         saved = self.board.remove_piece(pos)
-        
-        # 检查将帅是否因此被将军
-        in_check = self.is_king_in_check(piece.color)
-        
-        # 恢复棋子
-        self.board.set_piece(pos, saved)
-        
+
+        try:
+            in_check = self.is_king_in_check(piece.color)
+        finally:
+            self.board.set_piece(pos, saved)
+
         return in_check
 
     def _detect_fork(self, move: Move, piece: Piece) -> Optional[str]:
         """检测是否形成捉双
-        
+
         捉双定义：一个棋子同时攻击对方两个或以上高价值棋子（车、马、炮、将）。
         返回被捉双的最高价值棋子类型。
         """
         enemy_color = piece.color.opposite()
         attacked_pieces = []
-        
+
         # 获取该棋子在当前位置能攻击的所有位置
         attack_moves = self._get_piece_moves(move.to_pos, piece)
-        
+
         for target_pos in attack_moves:
             target = self.board.get_piece(target_pos)
             if target and target.color == enemy_color:
                 # 记录被攻击的棋子类型（过滤低价值棋子）
-                if target.piece_type in (PieceType.KING, PieceType.ROOK, 
-                                         PieceType.KNIGHT, PieceType.CANNON,
-                                         PieceType.ADVISOR, PieceType.BISHOP):
+                if target.piece_type in (
+                    PieceType.KING,
+                    PieceType.ROOK,
+                    PieceType.KNIGHT,
+                    PieceType.CANNON,
+                    PieceType.ADVISOR,
+                    PieceType.BISHOP,
+                ):
                     attacked_pieces.append(target.piece_type.value)
-        
+
         # 如果攻击2个或以上高价值棋子，返回最高价值的那个
         if len(attacked_pieces) >= 2:
-            # 价值排序：King > Rook > Cannon > Knight > Advisor > Bishop
             value_order = ["king", "rook", "cannon", "knight", "advisor", "bishop"]
-            for v in value_order:
-                if v in attacked_pieces:
-                    return v
+            unique_pieces = list(dict.fromkeys(attacked_pieces))
+            if len(unique_pieces) >= 2:
+                for v in value_order:
+                    if v in unique_pieces:
+                        return v
         return None
 
-    def _detect_sacrifice(self, move: Move, piece: Piece, original_piece) -> Optional[str]:
+    def _detect_sacrifice(
+        self, move: Move, piece: Piece, original_piece
+    ) -> Optional[str]:
         """检测是否主动弃子
-        
+
         弃子定义：主动将价值>=车的棋子放在可被对方吃掉的位置。
         返回被弃的棋子类型（如果构成弃子）。
         """
         # 只考虑大子（车、马、炮）
         if piece.piece_type not in (PieceType.ROOK, PieceType.KNIGHT, PieceType.CANNON):
             return None
-        
+
         # 检查目标位置是否可被对方吃掉
         enemy_color = piece.color.opposite()
-        
+
         # 模拟对方回合，看是否能吃掉这个位置的棋子
         for r in range(10):
             for c in range(9):
@@ -801,14 +819,13 @@ class RefereeEngine:
         original = self.remove_piece(move.from_pos)
         self.set_piece(move.to_pos, piece)
 
-        in_check = self.is_king_in_check(piece.color)
-
-        kings_facing = self._is_kings_facing()
-
-        self.set_piece(move.from_pos, original)
-        self.set_piece(move.to_pos, target_piece)
-
-        return not in_check and not kings_facing
+        try:
+            in_check = self.is_king_in_check(piece.color)
+            kings_facing = self._is_kings_facing()
+            return not in_check and not kings_facing
+        finally:
+            self.set_piece(move.from_pos, original)
+            self.set_piece(move.to_pos, target_piece)
 
     def remove_piece(self, pos: Position) -> Optional[Piece]:
         return self.board.remove_piece(pos)
@@ -823,14 +840,19 @@ class RefereeEngine:
         except ValueError:
             return False
 
-        # 检查起点是否有己方棋子
         piece = self.get_piece(move.from_pos)
         if piece is None or piece.color != self.board.current_color:
             return False
 
-        # 检查目标位置是否在合法移动中
-        legal_moves = self.get_legal_moves()
-        return iccs_move in legal_moves
+        target_piece = self.get_piece(move.to_pos)
+        if target_piece and target_piece.color == piece.color:
+            return False
+
+        target_positions = self._get_piece_moves(move.from_pos, piece)
+        if move.to_pos not in target_positions:
+            return False
+
+        return self._is_move_legal(move, piece)
 
     def apply_move(self, iccs_move: str) -> str:
         """执行走步，返回新FEN"""
@@ -850,9 +872,11 @@ class RefereeEngine:
         self.move_history.append(iccs_move)
 
         self.position_history.append(self.current_fen)
-        
+
         # 更新位置计数器（只比较棋盘部分）
-        board_key = self.current_fen.split()[0] if ' ' in self.current_fen else self.current_fen
+        board_key = (
+            self.current_fen.split()[0] if " " in self.current_fen else self.current_fen
+        )
         self._position_counter[board_key] = self._position_counter.get(board_key, 0) + 1
 
         after_check = self.is_king_in_check(self.board.current_color.opposite())
@@ -898,17 +922,19 @@ class RefereeEngine:
         if len(self.position_history) < 5:
             return False
 
-        current_board = self.current_fen.split()[0] if ' ' in self.current_fen else self.current_fen
-        
+        current_board = (
+            self.current_fen.split()[0] if " " in self.current_fen else self.current_fen
+        )
+
         # 优先使用位置计数器快速检查
         count = self._position_counter.get(current_board, 0)
         if count >= 3:
             return True
-        
+
         # 如果计数器不可用（如测试直接操作position_history），回退到列表计数
         if count == 0:
             count = self.position_history.count(self.current_fen)
-        
+
         return count >= 3
 
     def _find_king_position(self, color: Color) -> Optional[Position]:
@@ -951,21 +977,20 @@ class RefereeEngine:
         if black_king_pos is None:
             return True, "红方胜利 - 黑将被吃"
 
-        red_in_check = self.is_king_in_check(Color.RED)
-        black_in_check = self.is_king_in_check(Color.BLACK)
-
         legal_moves = self.get_legal_moves()
 
         if len(legal_moves) == 0:
+            current_in_check = self.is_king_in_check(self.board.current_color)
             if self.board.current_color == Color.RED:
-                return True, "黑方胜利 - 红方被困"
+                if current_in_check:
+                    return True, "黑方胜利 - 红方被将死"
+                else:
+                    return True, "黑方胜利 - 红方被困"
             else:
-                return True, "红方胜利 - 黑方被困"
-
-        if red_in_check and len(self._get_legal_moves_for_color(Color.RED)) == 0:
-            return True, "黑方胜利 - 红方被将死"
-        if black_in_check and len(self._get_legal_moves_for_color(Color.BLACK)) == 0:
-            return True, "红方胜利 - 黑方被将死"
+                if current_in_check:
+                    return True, "红方胜利 - 黑方被将死"
+                else:
+                    return True, "红方胜利 - 黑方被困"
 
         return False, ""
 
@@ -1071,9 +1096,41 @@ class RefereeEngine:
         return "Red" if self.board.current_color == Color.RED else "Black"
 
     def render_ascii_board(self, fen: str = None) -> str:
-        """渲染ASCII棋盘"""
+        """渲染ASCII棋盘
+
+        注意：传入 fen 参数会修改引擎状态（重新解析FEN）。
+        如果只需渲染而不想改变状态，请使用 render_ascii_board_readonly()。
+        """
         if fen:
             self._parse_fen(fen)
+
+        return self._build_ascii_board()
+
+    def render_ascii_board_readonly(self, fen: str) -> str:
+        """纯函数式渲染ASCII棋盘，不修改当前引擎状态
+
+        创建临时引擎解析FEN后渲染，保证当前状态不受影响。
+
+        Args:
+            fen: 要渲染的FEN字符串
+
+        Returns:
+            ASCII棋盘字符串
+        """
+        import copy
+
+        saved_board = copy.deepcopy(self.board)
+        saved_fen = self.current_fen
+
+        self._parse_fen(fen)
+        result = self._build_ascii_board()
+
+        self.board = saved_board
+        self.current_fen = saved_fen
+
+        return result
+
+    def _build_ascii_board(self) -> str:
 
         lines = [
             "    a   b   c   d   e   f   g   h   i",

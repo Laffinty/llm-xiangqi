@@ -5,7 +5,7 @@ Observer Sync/Async 桥接模块
 """
 
 import asyncio
-from typing import Callable, Optional
+from typing import Callable, Optional, Set
 from src.utils.logger import get_logger
 
 logger = get_logger("web_3d.observer_bridge", level="INFO")
@@ -21,6 +21,7 @@ class ObserverBridge:
         """
         self._async_broadcast = async_broadcast_func
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._pending_tasks: Set[asyncio.Task] = set()
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """设置事件循环引用
@@ -29,6 +30,15 @@ class ObserverBridge:
             loop: 异步事件循环
         """
         self._event_loop = loop
+
+    def _on_task_done(self, task: asyncio.Task) -> None:
+        """任务完成回调，记录异常并清理引用"""
+        self._pending_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"Observer broadcast task failed: {exc}")
 
     def __call__(self, move: str, fen: str, is_game_over: bool) -> None:
         """同步回调入口，由 GameController 调用
@@ -39,18 +49,13 @@ class ObserverBridge:
             is_game_over: 游戏是否结束
         """
         try:
-            # 尝试获取当前运行的事件循环
             loop = self._event_loop or asyncio.get_running_loop()
-
-            # 将异步广播任务调度到事件循环
-            # create_task 是线程安全的，可以从任何线程调用
-            loop.create_task(self._async_broadcast(move, fen, is_game_over))
+            task = loop.create_task(self._async_broadcast(move, fen, is_game_over))
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._on_task_done)
 
         except RuntimeError as e:
-            # 没有运行的事件循环
-            logger.warning(
-                f"No running event loop, skipping WebSocket broadcast: {e}"
-            )
+            logger.warning(f"No running event loop, skipping WebSocket broadcast: {e}")
 
 
 def make_sync_observer(web_server) -> Callable:
@@ -75,12 +80,22 @@ def make_sync_observer(web_server) -> Callable:
         >>> controller.register_observer(observer)
     """
 
+    _pending_tasks: Set[asyncio.Task] = set()
+
+    def _on_task_done(task: asyncio.Task) -> None:
+        _pending_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"Observer broadcast task failed: {exc}")
+
     def on_state_update(move: str, fen: str, is_game_over: bool) -> None:
         try:
             loop = asyncio.get_running_loop()
-            # 使用 create_task 将异步任务调度到事件循环
-            # 不等待结果，因为 Observer 回调不需要确认
-            loop.create_task(web_server.broadcast_move(move, fen, is_game_over))
+            task = loop.create_task(web_server.broadcast_move(move, fen, is_game_over))
+            _pending_tasks.add(task)
+            task.add_done_callback(_on_task_done)
         except RuntimeError:
             logger.warning("No running event loop, skipping WebSocket broadcast")
 

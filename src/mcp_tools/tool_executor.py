@@ -9,12 +9,16 @@ import asyncio
 import importlib
 import importlib.util
 import inspect
+import threading
 from pathlib import Path
 
 from .base_tool import BaseTool, ToolResult
 from .opening_book import OpeningBookTool
 from .evaluate_position import EvaluatePositionTool
 from .validate_move import ValidateMoveTool
+from ..utils.logger import get_logger
+
+logger = get_logger("mcp_tools.executor")
 
 
 class ToolExecutor:
@@ -24,6 +28,7 @@ class ToolExecutor:
     """
 
     _instance: Optional["ToolExecutor"] = None
+    _lock = threading.Lock()
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
@@ -34,9 +39,11 @@ class ToolExecutor:
 
     @classmethod
     def get_instance(cls, config: Optional[Dict[str, Any]] = None) -> "ToolExecutor":
-        """获取单例实例"""
+        """获取单例实例（线程安全）"""
         if cls._instance is None:
-            cls._instance = cls(config)
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls(config)
         return cls._instance
 
     @classmethod
@@ -91,10 +98,14 @@ class ToolExecutor:
                         try:
                             tool_instance = obj()  # type: ignore[call-arg]
                             self.register_tool(tool_instance)
-                        except (TypeError, Exception):
-                            pass
-        except Exception:
-            pass
+                        except TypeError:
+                            logger.warning(
+                                f"Cannot instantiate tool {name}: missing required arguments"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to instantiate tool {name}: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load tool from {file_path}: {e}")
 
     def register_tool(self, tool: BaseTool):
         """注册工具实例"""

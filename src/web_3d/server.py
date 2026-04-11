@@ -48,6 +48,7 @@ class Web3DServer:
         self.app = self._create_app()
         self.server: Optional[Any] = None  # uvicorn.Server
         self.ws_manager = WebSocketManager()
+        self._state_lock = threading.Lock()
         self._current_state: Optional[dict] = None
         self._game_info: dict = {}
         self._server_thread: Optional[threading.Thread] = None
@@ -56,6 +57,7 @@ class Web3DServer:
         # 延迟导入 uvicorn，避免事件循环问题
         try:
             import uvicorn
+
             self._uvicorn = uvicorn
         except ImportError:
             logger.error("uvicorn not installed, Web 3D server cannot start")
@@ -123,6 +125,7 @@ class Web3DServer:
             )
         else:
             logger.warning(f"Static directory not found: {static_dir}")
+
             # 创建一个简单的占位响应
             @app.get("/")
             async def root():
@@ -141,7 +144,19 @@ class Web3DServer:
             ws: WebSocket 连接
             data: 收到的消息字典
         """
-        msg_type = data.get("type", "")
+        if not isinstance(data, dict):
+            await self.ws_manager.send_error(
+                ws, "INVALID_MESSAGE", "Message must be a JSON object"
+            )
+            return
+
+        msg_type = data.get("type")
+        if not msg_type or not isinstance(msg_type, str):
+            await self.ws_manager.send_error(
+                ws, "MISSING_TYPE", "Message must contain a 'type' field"
+            )
+            return
+
         client_id = data.get("client_id")
 
         # 更新客户端信息
@@ -178,13 +193,15 @@ class Web3DServer:
             return
 
         # 发送当前游戏状态
-        if self._current_state:
+        with self._state_lock:
+            current_state = self._current_state
+        if current_state:
             await self.ws_manager.send_to(
                 ws,
                 {
                     "type": "game.init",
                     "timestamp": _now_ms(),
-                    "payload": self._current_state,
+                    "payload": current_state,
                 },
             )
             logger.debug(f"Sent game.init to client")
@@ -318,18 +335,19 @@ class Web3DServer:
 
         在收到走步通知时更新内部状态，供新连接的客户端获取。
         """
-        self._current_state = {
-            "fen": fen,
-            "turn": turn,
-            "turn_number": turn_number,
-            "move_history": move_history,
-            "legal_moves": legal_moves or [],
-            "players": players or {},
-            "last_move": last_move,
-            "status": status,
-            "result": result,
-            "result_reason": result_reason,
-        }
+        with self._state_lock:
+            self._current_state = {
+                "fen": fen,
+                "turn": turn,
+                "turn_number": turn_number,
+                "move_history": move_history,
+                "legal_moves": legal_moves or [],
+                "players": players or {},
+                "last_move": last_move,
+                "status": status,
+                "result": result,
+                "result_reason": result_reason,
+            }
 
     async def broadcast_move(self, move: str, fen: str, is_game_over: bool) -> None:
         """广播走步事件
@@ -356,17 +374,18 @@ class Web3DServer:
         turn_number = int(fen_parts[5]) if len(fen_parts) > 5 else 1
 
         # 更新内部状态
-        if self._current_state:
-            self._current_state["fen"] = fen
-            self._current_state["turn"] = turn
-            self._current_state["turn_number"] = turn_number
-            if move:
-                self._current_state.setdefault("move_history", []).append(move)
-            self._current_state["last_move"] = {
-                "from_pos": from_pos,
-                "to_pos": to_pos,
-                "move": move,
-            }
+        with self._state_lock:
+            if self._current_state:
+                self._current_state["fen"] = fen
+                self._current_state["turn"] = turn
+                self._current_state["turn_number"] = turn_number
+                if move:
+                    self._current_state.setdefault("move_history", []).append(move)
+                self._current_state["last_move"] = {
+                    "from_pos": from_pos,
+                    "to_pos": to_pos,
+                    "move": move,
+                }
 
         message = {
             "type": "game.move",
@@ -389,11 +408,12 @@ class Web3DServer:
         result = "unknown"
         result_reason = ""
 
-        if self._current_state:
-            result = self._current_state.get("result", "unknown")
-            result_reason = self._current_state.get("result_reason", "")
-            self._current_state["status"] = "finished"
-            self._current_state["fen"] = fen
+        with self._state_lock:
+            if self._current_state:
+                result = self._current_state.get("result", "unknown")
+                result_reason = self._current_state.get("result_reason", "")
+                self._current_state["status"] = "finished"
+                self._current_state["fen"] = fen
 
         message = {
             "type": "game.game_over",
@@ -410,16 +430,19 @@ class Web3DServer:
 
     def set_game_info(self, red_agent: str, black_agent: str) -> None:
         """设置游戏参与者信息"""
-        self._game_info = {
-            "red_agent": red_agent,
-            "black_agent": black_agent,
-        }
-        if self._current_state:
-            self._current_state["players"] = {
-                "Red": {"name": red_agent, "model": red_agent},
-                "Black": {"name": black_agent, "model": black_agent},
+        with self._state_lock:
+            self._game_info = {
+                "red_agent": red_agent,
+                "black_agent": black_agent,
             }
+            if self._current_state:
+                self._current_state["players"] = {
+                    "Red": {"name": red_agent, "model": red_agent},
+                    "Black": {"name": black_agent, "model": black_agent},
+                }
 
     def is_running(self) -> bool:
         """检查服务器是否正在运行"""
-        return self._is_running and self._server_thread and self._server_thread.is_alive()
+        return (
+            self._is_running and self._server_thread and self._server_thread.is_alive()
+        )

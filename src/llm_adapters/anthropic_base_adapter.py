@@ -33,7 +33,7 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
         timeout: int = 30,
         max_retries: int = 3,
         temperature: float = 0.7,
-        max_tokens: int = 2048
+        max_tokens: int = 2048,
     ):
         super().__init__(
             api_key=api_key,
@@ -42,19 +42,20 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
             timeout=timeout,
             max_retries=max_retries,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
 
-        os.environ["ANTHROPIC_BASE_URL"] = base_url
-        os.environ["ANTHROPIC_API_KEY"] = api_key
-
-        self.client = anthropic.Anthropic(timeout=timeout)
+        self.client = anthropic.Anthropic(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
 
     async def chat(
         self,
         messages: List[Dict[str, str]],
         tools: Optional[List[Dict]] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """发送聊天请求（支持 thinking 和 tool_use）"""
 
@@ -72,15 +73,14 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
         for msg in filtered_messages:
             content = msg.get("content", "")
             if isinstance(content, str):
-                anthropic_messages.append({
-                    "role": msg["role"],
-                    "content": [{"type": "text", "text": content}]
-                })
+                anthropic_messages.append(
+                    {
+                        "role": msg["role"],
+                        "content": [{"type": "text", "text": content}],
+                    }
+                )
             elif isinstance(content, list):
-                anthropic_messages.append({
-                    "role": msg["role"],
-                    "content": content
-                })
+                anthropic_messages.append({"role": msg["role"], "content": content})
 
         params: Dict[str, Any] = {
             "model": self.model,
@@ -102,21 +102,20 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
                 loop = asyncio.get_event_loop()
                 response = await asyncio.wait_for(
                     loop.run_in_executor(
-                        None,
-                        lambda: self.client.messages.create(**params)
+                        None, lambda: self.client.messages.create(**params)
                     ),
-                    timeout=timeout
+                    timeout=timeout,
                 )
                 return self._parse_response(response)
             except asyncio.TimeoutError:
                 last_error = Exception(f"{self.model} API timeout after {timeout}s")
                 timeout = min(timeout * 1.5, 60)
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
             except Exception as e:
                 last_error = e
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
 
         raise last_error or Exception(f"{self.model} API call failed")
 
@@ -133,16 +132,13 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
                 text_content.append(block.text)
             elif block.type == "tool_use":
                 tool_calls = tool_calls or []
-                tool_calls.append({
-                    "name": block.name,
-                    "arguments": block.input
-                })
+                tool_calls.append({"name": block.name, "arguments": block.input})
 
         return LLMResponse(
             content="\n".join(text_content),
             thought=thought,
             tool_calls=tool_calls,
-            raw_response=response
+            raw_response=response,
         )
 
     async def close(self):

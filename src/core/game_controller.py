@@ -5,7 +5,6 @@
 """
 
 from typing import Optional, Tuple, Dict, Any
-from dataclasses import dataclass
 import asyncio
 
 from .referee_engine import RefereeEngine, INITIAL_FEN, Color
@@ -23,6 +22,7 @@ logger = get_logger(__name__)
 # 游戏结束原因常量
 class GameEndReasons:
     """游戏结束原因字符串常量"""
+
     # 长将判负
     RED_PERPETUAL_CHECK = "红方长将"
     BLACK_PERPETUAL_CHECK = "黑方长将"
@@ -39,7 +39,6 @@ class GameEndReasons:
     STALEMATE = "Stalemate"
 
 
-@dataclass
 class GameController:
     """
     游戏控制器
@@ -140,10 +139,7 @@ class GameController:
             return GameResult.RED_WIN
         if reason.startswith(GameEndReasons.BLACK_VICTORY):
             return GameResult.BLACK_WIN
-        # Fallback: heuristic based on current turner losing
-        from .referee_engine import Color
-        # Should not normally reach here; kept for forward-compatibility
-        return GameResult.RED_WIN  # pragma: no cover
+        raise ValueError(f"Unknown game end reason: {reason}")
 
     def _validate_iccs_format(self, move: str) -> bool:
         """验证ICCS走步格式"""
@@ -195,12 +191,14 @@ class LLMAgentGameController(GameController):
         black_agent=None,
         referee_engine: Optional[RefereeEngine] = None,
         max_turns: int = 200,
+        turn_timeout: int = 120,
     ):
         super().__init__(referee_engine, max_turns)
         self.red_agent = red_agent
         self.black_agent = black_agent
         self.current_agent = None
         self._observers: list = []
+        self.turn_timeout = turn_timeout
 
     def _count_non_king_pieces(self, color: str) -> int:
         """计算指定颜色的非将/帅棋子数量"""
@@ -279,6 +277,7 @@ class LLMAgentGameController(GameController):
             # 投降检测
             if result.resign or result.move == "jxjx":
                 from .referee_engine import Color
+
                 agent_name = self.current_agent.config.name
                 resigner_color = self.current_agent.config.color
                 resigner_color_enum = Color(resigner_color.lower())
@@ -315,12 +314,18 @@ class LLMAgentGameController(GameController):
                 logger.info(f"{agent_name} 投降认输，原因: {result.thought}")
                 if self.phase == GamePhase.RED_TO_MOVE:
                     self.result = GameResult.BLACK_WIN
-                    self.result_reason = f"{GameEndReasons.RESIGNATION_RED}: {result.thought}"
+                    self.result_reason = (
+                        f"{GameEndReasons.RESIGNATION_RED}: {result.thought}"
+                    )
                 else:
                     self.result = GameResult.RED_WIN
-                    self.result_reason = f"{GameEndReasons.RESIGNATION_BLACK}: {result.thought}"
+                    self.result_reason = (
+                        f"{GameEndReasons.RESIGNATION_BLACK}: {result.thought}"
+                    )
                 self.phase = GamePhase.GAME_OVER
-                return MoveResult(success=True, error=None, thought=f"投降认输: {result.thought}")
+                return MoveResult(
+                    success=True, error=None, thought=f"投降认输: {result.thought}"
+                )
 
             if result.move and result.move in legal_moves:
                 move_result = self.apply_move(
@@ -351,7 +356,6 @@ class LLMAgentGameController(GameController):
             游戏结果信息
         """
 
-
         if verbose:
             logger.info("=" * 60)
             logger.info("LLM Chinese Chess Game Started")
@@ -380,7 +384,13 @@ class LLMAgentGameController(GameController):
                 self.result_reason = GameEndReasons.MAX_TURNS
                 break
 
-            move_result = await self.play_turn()
+            try:
+                move_result = await asyncio.wait_for(
+                    self.play_turn(), timeout=self.turn_timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Turn timed out after {self.turn_timeout}s")
+                break
 
             if not move_result.success:
                 logger.error(f"Move failed: {move_result.error}")

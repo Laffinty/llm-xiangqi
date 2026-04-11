@@ -52,8 +52,7 @@ def _create_adapter(llm_config: dict) -> BaseLLMAdapter:
     adapter_cls = ADAPTER_MAP.get(provider)
     if not adapter_cls:
         raise ValueError(
-            f"Unknown LLM provider: '{provider}'. "
-            f"Supported: {list(ADAPTER_MAP.keys())}"
+            f"Unknown LLM provider: '{provider}'. Supported: {list(ADAPTER_MAP.keys())}"
         )
     return adapter_cls(
         api_key=llm_config["api_key"],
@@ -106,9 +105,11 @@ def load_agents():
     return agent1, agent2
 
 
-async def run_battle(agent1, agent2, max_turns: int = 100, gui_config: GUIConfig = None):
+async def run_battle(
+    agent1, agent2, max_turns: int = 100, gui_config: GUIConfig = None
+):
     """运行完整对局
-    
+
     支持原生 3D GUI 和 Web 3D 两种可视化模式，通过 gui_config 配置控制。
     """
     logger.info("=" * 60)
@@ -153,13 +154,13 @@ async def run_battle(agent1, agent2, max_turns: int = 100, gui_config: GUIConfig
             )
             web_server = Web3DServer(gui_config.web_3d_config)
             web_server.start()
-            
+
             # 设置游戏信息
             web_server.set_game_info(
                 red_agent=f"{agent1.config.name} ({agent1.config.llm_adapter.model})",
                 black_agent=f"{agent2.config.name} ({agent2.config.llm_adapter.model})",
             )
-            
+
             # 初始化游戏状态
             initial_state = controller.get_current_state()
             web_server.update_game_state(
@@ -208,7 +209,6 @@ async def run_battle(agent1, agent2, max_turns: int = 100, gui_config: GUIConfig
                 result_reason=result.get("result_reason"),
             )
             # 广播游戏结束
-            import asyncio
             await web_server.broadcast_move(
                 "", result.get("final_fen", state.fen), is_game_over=True
             )
@@ -220,10 +220,13 @@ async def run_battle(agent1, agent2, max_turns: int = 100, gui_config: GUIConfig
         logger.info("\n" + "=" * 60)
         logger.info("GAME OVER")
         logger.info("=" * 60)
-        logger.info(f"Result: {result['result']}")
-        logger.info(f"Reason: {result['result_reason']}")
-        logger.info(f"Total turns: {result['turn_count']}")
-        logger.info(f"Move history: {' '.join(result['move_history'])}")
+        if result:
+            logger.info(f"Result: {result.get('result', 'unknown')}")
+            logger.info(f"Reason: {result.get('result_reason', 'unknown')}")
+            logger.info(f"Total turns: {result.get('turn_count', 0)}")
+            logger.info(f"Move history: {' '.join(result.get('move_history', []))}")
+        else:
+            logger.info("No result available (game may have been interrupted)")
 
         return result
 
@@ -241,7 +244,10 @@ async def main():
         "--turns", type=int, default=100, help="最大回合数 (default: 100)"
     )
     parser.add_argument(
-        "--config", type=str, default="config/game_config.yaml", help="配置文件路径 (default: config/game_config.yaml)"
+        "--config",
+        type=str,
+        default="config/game_config.yaml",
+        help="配置文件路径 (default: config/game_config.yaml)",
     )
     args = parser.parse_args()
 
@@ -249,10 +255,12 @@ async def main():
     config_path = Path(args.config)
     if not config_path.is_absolute():
         config_path = Path(__file__).parent / config_path
-    
+
     try:
         gui_config = ConfigLoader.load_gui_config(str(config_path))
-        logger.info(f"Loaded config from {config_path}, 3D GUI: {'enabled' if gui_config.enable_3d else 'disabled'}")
+        logger.info(
+            f"Loaded config from {config_path}, 3D GUI: {'enabled' if gui_config.enable_3d else 'disabled'}"
+        )
     except Exception as e:
         logger.warning(f"Failed to load config: {e}, using defaults (3D GUI disabled)")
         gui_config = GUIConfig(enable_3d=False, web_3d=True)

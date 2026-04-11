@@ -65,9 +65,15 @@ class Logger:
     def get_logger(
         cls, name: str, level: str = "INFO", log_file: Optional[str] = None
     ) -> logging.Logger:
-        """获取日志实例"""
+        """获取日志实例
+
+        如果实例已存在且 level 与当前不同，会动态更新日志级别。
+        """
         if name not in cls._instances:
             cls._instances[name] = cls(name, level, log_file)
+        elif level:
+            existing = cls._instances[name]
+            existing.logger.setLevel(getattr(logging, level.upper()))
         return cls._instances[name].logger
 
 
@@ -75,14 +81,14 @@ def get_logger(
     name: str, level: Optional[str] = None, log_file: Optional[str] = None
 ) -> logging.Logger:
     """便捷函数：获取日志实例
-    
+
     日志级别优先级：参数 > 环境变量 LOG_LEVEL > 默认值 INFO
-    
+
     Args:
         name: 日志器名称
         level: 日志级别（可选，默认从环境变量读取）
         log_file: 日志文件路径（可选）
-        
+
     Returns:
         logging.Logger: 配置好的日志实例
     """
