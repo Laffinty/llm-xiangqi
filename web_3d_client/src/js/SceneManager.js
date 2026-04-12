@@ -13,6 +13,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { MoveAnimator } from './MoveAnimator.js'
 import { ParticleSystem } from './ParticleSystem.js'
 import { SoundManager } from './SoundManager.js'
+import { PIECE_NAMES } from './GameStateManager.js'
 
 // 渲染器类型
 const RENDERER_TYPE = {
@@ -555,12 +556,14 @@ export class SceneManager {
     // 透明背景
     ctx.clearRect(0, 0, 128, 128)
     
-    // 文字
+    // 文字 - 使用楷体确保繁体字符显示正确
+    const displayChar = this._getPieceDisplayChar(char)
+    console.log('[Scene] Creating piece text:', char, '->', displayChar)
     ctx.fillStyle = '#' + color.toString(16).padStart(6, '0')
-    ctx.font = 'bold 80px "Microsoft YaHei", "SimHei", serif'
+    ctx.font = 'bold 80px "KaiTi", "STKaiti", "楷体", "SimSun", serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(this._getPieceDisplayChar(char), 64, 64)
+    ctx.fillText(displayChar, 64, 64)
     
     const texture = new THREE.CanvasTexture(canvas)
     const material = new THREE.MeshBasicMaterial({
@@ -580,11 +583,8 @@ export class SceneManager {
    * 获取棋子显示字符
    */
   _getPieceDisplayChar(char) {
-    const names = {
-      'K': '帅', 'A': '仕', 'B': '相', 'N': '馬', 'R': '車', 'C': '炮', 'P': '兵',
-      'k': '将', 'a': '士', 'b': '象', 'n': '马', 'r': '车', 'c': '砲', 'p': '卒',
-    }
-    return names[char] || char
+    // 使用 GameStateManager 的统一映射表
+    return PIECE_NAMES[char] || char
   }
 
   /**
