@@ -581,7 +581,7 @@ export class SceneManager {
    */
   _getPieceDisplayChar(char) {
     const names = {
-      'K': '帅', 'A': '仕', 'B': '相', 'N': '傌', 'R': '俥', 'C': '炮', 'P': '兵',
+      'K': '帅', 'A': '仕', 'B': '相', 'N': '馬', 'R': '車', 'C': '炮', 'P': '兵',
       'k': '将', 'a': '士', 'b': '象', 'n': '马', 'r': '车', 'c': '砲', 'p': '卒',
     }
     return names[char] || char
