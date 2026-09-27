@@ -59,10 +59,22 @@ class GameController:
         self.phase = GamePhase.RED_TO_MOVE
         self.result = GameResult.IN_PROGRESS
         self.result_reason: Optional[str] = None
+        # 上一步由哪个 Agent 走出（引擎只记录走步，不记录 Agent）
+        self.last_move_by: Optional[str] = None
 
     def get_current_state(self) -> GameState:
-        """获取当前游戏状态"""
-        return GameState.from_engine(self.referee)
+        """获取当前游戏状态
+
+        将 controller 自身的 phase/result/last_move_by 透传给 GameState，
+        否则 LLM 看到的 phase 永远是 NOT_STARTED、last_move 永远是 None。
+        """
+        return GameState.from_engine(
+            self.referee,
+            phase=self.phase,
+            result=self.result,
+            result_reason=self.result_reason,
+            last_move_by=self.last_move_by,
+        )
 
     def get_current_turn(self) -> str:
         """获取当前回合"""
@@ -98,10 +110,7 @@ class GameController:
             new_fen = self.referee.apply_move(iccs_move)
 
             self.turn_count += 1
-
-            state = self.get_current_state()
-            state.last_move = iccs_move
-            state.last_move_by = agent_name
+            self.last_move_by = agent_name
 
             is_over, reason = self.referee.check_game_end()
             if is_over:
@@ -164,6 +173,7 @@ class GameController:
         self.phase = GamePhase.RED_TO_MOVE
         self.result = GameResult.IN_PROGRESS
         self.result_reason = None
+        self.last_move_by = None
 
     def get_game_info(self) -> Dict[str, Any]:
         """获取游戏信息"""
@@ -174,6 +184,10 @@ class GameController:
             "result": self.result.value,
             "result_reason": self.result_reason,
             "current_turn": self.get_current_turn(),
+            "last_move": (
+                self.referee.move_history[-1] if self.referee.move_history else None
+            ),
+            "last_move_by": self.last_move_by,
             "move_history": self.referee.move_history.copy(),
         }
 
@@ -437,4 +451,13 @@ class LLMAgentGameController(GameController):
             "result": self.result.value,
             "result_reason": self.result_reason,
             "move_history": self.referee.move_history.copy(),
+            # 下游（Web 3D / 原生 GUI）依赖这两个键渲染终局画面，
+            # 缺失时它们会回退到开局 FEN，棋盘不会跳到终局。
+            "final_fen": self.referee.current_fen,
+            "turn": self.get_current_turn(),
+            "phase": self.phase.value,
+            "last_move": (
+                self.referee.move_history[-1] if self.referee.move_history else None
+            ),
+            "last_move_by": self.last_move_by,
         }

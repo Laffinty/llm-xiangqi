@@ -23,7 +23,6 @@ from pathlib import Path
 
 from src.core.referee_engine import RefereeEngine, INITIAL_FEN
 from src.core.game_controller import LLMAgentGameController
-from src.gui.chess_gui import ChessGUI
 from src.agents.llm_agent import LLMAgent
 from src.web_3d import Web3DServer, make_sync_observer
 from src.agents.base_agent import AgentConfig
@@ -34,6 +33,11 @@ from src.llm_adapters.mimo_adapter import MiMoAdapter
 from src.llm_adapters.minimax_adapter import MiniMaxAdapter
 from src.utils.config_loader import ConfigLoader, GUIConfig
 from src.utils.logger import get_logger
+
+
+# 注意：原生 3D GUI (pyglet) 与 Web 3D 服务均在需要时才导入。
+# 此前本模块顶层 import ChessGUI，导致未安装 pyglet 时整个应用无法启动，
+# 即使配置走的是 gui.3d: false 的 Web 路线。GUI 是可选展示层，不应是硬依赖。
 
 
 ADAPTER_MAP = {
@@ -132,8 +136,10 @@ async def run_battle(
     try:
         # 根据配置决定启动哪种 GUI
         if gui_config and gui_config.enable_3d:
-            # 原生 3D GUI (pyglet)
+            # 原生 3D GUI (pyglet) —— 惰性导入，仅此分支需要 pyglet
             logger.info("Native 3D GUI enabled, starting GUI...")
+            from src.gui.chess_gui import ChessGUI  # 局部导入：pyglet 为可选依赖
+
             red_name = f"红方:{agent1.config.llm_adapter.model}"
             black_name = f"黑方:{agent2.config.llm_adapter.model}"
             gui = ChessGUI(
@@ -215,7 +221,11 @@ async def run_battle(
 
         # 原生 GUI 结束通知
         if gui:
-            gui.update(fen=state.fen, is_game_over=True)
+            # 必须用终局 FEN，不能用开局 state.fen，否则 GUI 停在初始画面
+            gui.update(
+                fen=result.get("final_fen", state.fen) if result else state.fen,
+                is_game_over=True,
+            )
 
         logger.info("\n" + "=" * 60)
         logger.info("GAME OVER")

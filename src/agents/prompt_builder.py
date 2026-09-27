@@ -157,14 +157,16 @@ class PromptBuilder:
         return self.build_messages(system_prompt, user_content)
 
     # 棋子类型中文名映射
+    # 键必须与 RefereeEngine 产出的 PieceType.value 一致（小写），
+    # 否则 capture:/fork:/sacrifice: 标注会静默退化成英文（如「吃rook」）
     _PIECE_TYPE_CN = {
-        "King": "将",
-        "Advisor": "仕",
-        "Bishop": "相",
-        "Knight": "马",
-        "Rook": "车",
-        "Cannon": "炮",
-        "Pawn": "兵",
+        "king": "将",
+        "advisor": "仕",
+        "bishop": "相",
+        "knight": "马",
+        "rook": "车",
+        "cannon": "炮",
+        "pawn": "兵",
     }
 
     def _format_annotation(self, ann: str) -> str:

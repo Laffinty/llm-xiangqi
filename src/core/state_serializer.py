@@ -62,17 +62,43 @@ class GameState:
         }
 
     @classmethod
-    def from_engine(cls, engine) -> "GameState":
-        """从RefereeEngine创建GameState"""
+    def from_engine(
+        cls,
+        engine,
+        *,
+        phase: GamePhase = GamePhase.NOT_STARTED,
+        result: GameResult = GameResult.IN_PROGRESS,
+        result_reason: Optional[str] = None,
+        last_move_by: Optional[str] = None,
+    ) -> "GameState":
+        """从RefereeEngine创建GameState
+
+        Args:
+            engine: RefereeEngine 实例
+            phase: 对局阶段（由 GameController 提供，引擎本身不感知）
+            result: 对局结果（由 GameController 提供）
+            result_reason: 终局原因
+            last_move_by: 上一步由哪个 Agent 走出（引擎不记录 Agent，需外部传入）
+
+        Note:
+            last_move 直接取自 engine.move_history（引擎是走步的唯一事实来源），
+            不接受外部传入，避免与引擎状态不一致。
+        """
         annotated_moves = engine.get_annotated_moves()
+        move_history = engine.move_history
         return cls(
             turn=engine.get_current_turn(),
             fen=engine.current_fen,
             ascii_board=engine.render_ascii_board(),
             legal_moves=[m["move"] for m in annotated_moves],
             legal_moves_count=len(annotated_moves),
-            game_history=engine.move_history.copy(),
+            game_history=move_history.copy(),
             annotated_moves=annotated_moves,
+            last_move=move_history[-1] if move_history else None,
+            last_move_by=last_move_by,
+            phase=phase,
+            result=result,
+            result_reason=result_reason,
         )
 
 
