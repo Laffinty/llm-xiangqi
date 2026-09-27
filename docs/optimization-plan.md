@@ -11,20 +11,22 @@
 
 **规则引擎（`referee_engine.py`）是这个项目最有价值的资产**——走法生成、飞将、蹩马腿、炮架判定都写得准确且有 89% 覆盖。**问题不在算法，在"接线"**：大量已写好的功能因为一两个字段名不一致、返回值缺键、模块导入顺序而**根本没被执行到**。README 里承诺的"完整规则引擎 / MCP 工具系统 / 3D 可视化"有相当一部分是**声明存在、实际失效**。
 
-本次共确认 **41 项缺陷**，其中：
+本次共确认 **43 项缺陷**，其中：
 
-| 级别 | 数量 | 含义 |
-|---|---|---|
-| **P0** | 5 | 阻断级：程序跑不起来，或核心功能从未生效 |
-| **P1** | 11 | 正确性：象棋规则判错、状态撕裂、胜负误判 |
-| **P2** | 16 | 架构：模块边界错位、"可扩展"设计名存实亡 |
-| **P3** | 9 | 工程化：覆盖率、文档漂移、安全默认值 |
+| 级别 | 数量 | 含义 | 状态 |
+|---|---|---|---|
+| **P0** | 5 | 阻断级：程序跑不起来，或核心功能从未生效 | ✅ **已全部修复**（`7185695`） |
+| **P1** | 11 | 正确性：象棋规则判错、状态撕裂、胜负误判 | 待修 |
+| **P2** | 18 | 架构：模块边界错位、"可扩展"设计名存实亡 | 待修 |
+| **P3** | 9 | 工程化：覆盖率、文档漂移、安全默认值 | 待修 |
 
 > 所有 P0/P1 结论均已在本机实测复现，非静态推测。文中标注 `[已实测]`。
+>
+> P0 修复说明：5 项已由 `tests/test_p0_regressions.py`（44 项回归测试）固化，测试数 115 → 159。P0-1 修复后 `pyglet>=1.5.0,<2.0` 的 pin 不再是必需品，相关清理见 **P3-9**。
 
 ---
 
-## 1. P0 —— 阻断级缺陷（建议优先修复）
+## 1. P0 —— 阻断级缺陷（✅ 已全部修复，提交 `7185695`）
 
 ### P0-1 `import game` 直接崩溃，程序无法启动 `[已实测]`
 
@@ -750,6 +752,41 @@ API key 错误会白白等 3 秒再失败。另外 `except asyncio.TimeoutError`
 
 **修复**：合并为单一 CLI，`main.py` 保留为 `--mode demo` 子命令。
 
+### P3-8 `main.py` demo 第二步走步非法 `[已实测]`
+
+`main.py:56` 演示黑方走 `i7e7`，但黑炮在 **h7** 而非 i7：
+
+```
+Move failed: Illegal move: i7e7, current_turn=Black, legal_moves=['a6a5', 'c6c5', ...]
+```
+
+**定级依据**：属于 P3 而非 P0。`python main.py --mode demo` **能正常跑完并 `EXIT=0`**，只是第二步打出 error 日志（实测）。既不是"程序跑不起来"，demo 也不是核心功能（核心是对战流程 `game.py`），第一步 `h2e2` 正常。属于演示数据笔误。
+
+**修复**：`i7e7` → `h7e7`。顺带把这两步改成走 `GameController.play_turn()`，与 P3-7 一并处理。
+
+### P3-9 `pyglet` 版本 pin 已成维护债
+
+```text
+pyglet>=1.5.0,<2.0
+```
+
+这个 pin 原本是为了绕开 P0-1（`pyglet.gl.glu` 在 2.x 被移除）。**P0-1 修复后**，`game.py` 已改为分支内惰性导入 GUI，pyglet 2.x 可正常运行（实测环境 2.1.16 下 `import game` 通过）。
+
+**定级依据**：属于 P3 而非 P0。当前 pin 反而**让** pyglet 1.5（含 `glu`）被装上，GUI 路径功能正常——没有任何东西被阻断。
+
+**代价**：把整个项目钉死在 2020 年的 pyglet 1.x 分支上（1.5.x 早已停止维护），且与 P3-2 的依赖整理割裂。
+
+**修复**：随 P3-2 一并把 pyglet 拆为可选 extra：
+
+```text
+# 必需
+pyyaml, openai, fastapi, uvicorn[standard], websockets, pytest, pytest-asyncio
+# 可选：仅 gui.3d=true 时需要
+pyglet>=2.0 ; extra == "native-gui"
+```
+
+同时需为 `chess_gui.py:20` 的 `from pyglet.gl import glu` 提供 pyglet 2.x 兼容写法（2.x 需 `from pyglet.gl import *` 并自行取 `gluBegin/gluPerspective`，或改用自实现的透视投影矩阵）。
+
 ---
 
 ## 5. 建议的目标架构
@@ -798,22 +835,23 @@ llm-xiangqi/
 
 ## 6. 分阶段路线图
 
-### 阶段 0：止血（约 1 天，纯 bugfix，不改架构）
+### 阶段 0：止血（约 1 天，纯 bugfix，不改架构）—— ✅ **P0 部分已完成**（`7185695`）
 
-| # | 动作 | 对应 |
-|---|---|---|
-| 0.1 | GUI 惰性导入，`import game` 恢复可用 | P0-1 |
-| 0.2 | `_PIECE_TYPE_CN` 键改小写 | P0-4 |
-| 0.3 | `GameState.from_engine` 接收并透传 phase/last_move | P0-2 |
-| 0.4 | `run_game()` 返回 `final_fen` + `turn` | P0-3 |
-| 0.5 | 清理各 `__init__.py` eager import | P0-5 |
-| 0.6 | 初始局面入 `position_history` | P1-2 |
-| 0.7 | `to_fen()` 维护 halfmove/fullmove | P1-1 |
-| 0.8 | `phase` 从 FEN 推导 | P1-6 |
-| 0.9 | 超时收敛为明确终局 | P1-7 |
-| 0.10 | 补全 `_map_reason_to_result` 全部分支 | P1-5 |
+| # | 动作 | 对应 | 状态 |
+|---|---|---|---|
+| 0.1 | GUI 惰性导入，`import game` 恢复可用 | P0-1 | ✅ |
+| 0.2 | `_PIECE_TYPE_CN` 键改小写 | P0-4 | ✅ |
+| 0.3 | `GameState.from_engine` 接收并透传 phase/last_move | P0-2 | ✅ |
+| 0.4 | `run_game()` 返回 `final_fen` + `turn` | P0-3 | ✅ |
+| 0.5 | 清理各 `__init__.py` eager import | P0-5 | ✅ |
+| 0.6 | 初始局面入 `position_history` | P1-2 | 待做 |
+| 0.7 | `to_fen()` 维护 halfmove/fullmove | P1-1 | 待做 |
+| 0.8 | `phase` 从 FEN 推导 | P1-6 | 待做 |
+| 0.9 | 超时收敛为明确终局 | P1-7 | 待做 |
+| 0.10 | 补全 `_map_reason_to_result` 全部分支 | P1-5 | 待做 |
 
-> 这一阶段结束即可消除"跑不起来 + 战术标注失效 + 终局显示错误"三个最刺眼的问题。**每项改动都应配一条回归测试。**
+> 0.1-0.5 已由 `tests/test_p0_regressions.py`（44 项）固化，测试 115 → 159。
+> 0.6-0.10 属 P1，建议与**阶段 1** 一并处理。
 
 ### 阶段 1：正确性（约 3-5 天）
 
@@ -848,7 +886,8 @@ llm-xiangqi/
 - 引入 **perft** 测试（以初始局面为基准校验走法生成正确性）——这是规则引擎唯一可靠的自动化验证手段
 - 配置文件成为唯一事实来源，同步修正 README（P3-3）
 - 构建产物移出 git（P2-18）
-- 合并 `main.py` / `game.py` 入口（P3-7）
+- 合并 `main.py` / `game.py` 入口，顺带修 demo 走步（P3-7、P3-8）
+- 依赖整理：`pyglet` 拆为 `[native-gui]` 可选 extra + 兼容 2.x（P3-9、P3-2）
 - `host` 默认改 `127.0.0.1`（P3-4）
 
 ### 阶段 5：功能增强（可选）
@@ -865,11 +904,11 @@ llm-xiangqi/
 
 | ID | 级别 | 摘要 | 位置 |
 |---|---|---|---|
-| P0-1 | P0 | `import game` 因 pyglet 崩溃 `[实测]` | `game.py:26` |
-| P0-2 | P0 | `phase`/`last_move` 恒为缺省 `[实测]` | `state_serializer.py:65` |
-| P0-3 | P0 | 终局推送开局 FEN `[实测]` | `game.py:203,218` |
-| P0-4 | P0 | 标注棋子名退化英文 `[实测]` | `prompt_builder.py:160` |
-| P0-5 | P0 | 纯文本模块依赖 `openai` `[实测]` | `llm_adapters/__init__.py` |
+| P0-1 | P0 ✅已修 | `import game` 因 pyglet 崩溃 `[实测]` | `game.py:26` |
+| P0-2 | P0 ✅已修 | `phase`/`last_move` 恒为缺省 `[实测]` | `state_serializer.py:65` |
+| P0-3 | P0 ✅已修 | 终局推送开局 FEN `[实测]` | `game.py:203,218` |
+| P0-4 | P0 ✅已修 | 标注棋子名退化英文 `[实测]` | `prompt_builder.py:160` |
+| P0-5 | P0 ✅已修 | 纯文本模块依赖 `openai` `[实测]` | `llm_adapters/__init__.py` |
 | P1-1 | P1 | FEN 丢弃 halfmove/fullmove `[实测]` | `referee_engine.py:352` |
 | P1-2 | P1 | 三次重复漏算初始局面 `[实测]` | `referee_engine.py:216` |
 | P1-3 | P1 | 长将判负冤枉防守方 | `referee_engine.py:883` |
@@ -900,9 +939,11 @@ llm-xiangqi/
 | P2-17 | P2 | Web 3D 封装/竞态/私有属性 | `server.py` |
 | P2-18 | P2 | 构建产物入库 | `src/web_3d/static/assets` |
 | P3-1 | P3 | 覆盖率 47%，主循环 0% `[实测]` | `tests/` |
-| P3-2 | P3 | 无 CI / Lint / 类型检查 | — |
+| P3-2 | P3 | 无 CI / Lint / 类型检查 / 依赖整理 | — |
 | P3-3 | P3 | README 与实现不符 | `README.md:84` |
 | P3-4 | P3 | 默认 `0.0.0.0` 全网暴露 | `config_loader.py:156` |
 | P3-5 | P3 | 走步正则提取脆弱 | `base_agent.py:252` |
 | P3-6 | P3 | 不可重试错误也重试 | `openai_base_adapter.py:86` |
 | P3-7 | P3 | 两个入口职责重叠 | `main.py` / `game.py` |
+| P3-8 | P3 | demo 第二步走步非法 `[实测]` | `main.py:56` |
+| P3-9 | P3 | `pyglet` pin 已成维护债（P0-1 后） | `requirements.txt` |
