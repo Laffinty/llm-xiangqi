@@ -23,11 +23,22 @@ python -m tests.eval.run --probe --api-file C:\path\to\TEST_API.txt
 # 3. 跑基线
 python -m tests.eval.run --games 7 --seed 42 --max-turns 40 --out docs/eval-baseline.json
 
+# 3b. thinking 开关 A/B（回答「关掉 thinking 是否削弱棋力」）
+python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
+    --thinking true --out docs/eval-thinking-on.json
+
 # 4. 复验报告自洽性
 python -m tests.eval.run --verify docs/eval-baseline.json
 ```
 
-常用开关：`--both-sides`（正反两个方向）、`--only-category endgame in_check`。
+常用开关：`--both-sides`（正反两个方向）、`--only-category endgame in_check`、
+`--thinking true|false`（覆盖 config，用于 A/B）。
+
+**A/B 必须用同一个 `--seed`**：局面顺序由 seed 派生，两次跑的局面集与顺序完全一致，
+差异才归因于被测变量。
+
+**git 状态在开跑前采集**：报告里的 `commit` / `dirty` 若在跑完之后才取，
+期间发生的任何提交都会让报告声称自己来自一个它没跑过的 commit。基线必须自述。
 
 密钥文件格式（每行一条，`【name】...sk-xxx`）：
 

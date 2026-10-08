@@ -86,16 +86,25 @@ async def cmd_run(args) -> int:
     if args.both_sides:
         matchups.append(("mimo", "deepseek"))
 
+    # git 状态必须在开跑【之前】采集。若在跑完之后才取，
+    # 期间发生的任何提交都会让报告声称自己来自一个它没跑过的 commit。
+    git_state = {"commit": _git_commit(),
+                 "dirty": _diff_mode(["src", "prompts", "config", "tests/eval"])}
+
     print("局面 %d 个 / 对阵 %d 组 / 预计 %d 局" % (len(ordered), len(matchups), len(ordered) * len(matchups)))
+    if args.thinking is not None:
+        print("thinking 覆盖: %s" % ("ON" if args.thinking else "OFF"))
     records = await runner.play_all(
         ordered, matchups, keys,
-        max_turns=args.max_turns, temperature=runner.EVAL_TEMPERATURE)
+        max_turns=args.max_turns, temperature=runner.EVAL_TEMPERATURE,
+        thinking=args.thinking)
 
     meta = {
-        "commit": _git_commit(),
-        "dirty": _diff_mode(["src", "prompts", "config", "tests/eval"]),
+        "commit": git_state["commit"],
+        "dirty": git_state["dirty"],
         "seed": args.seed,
         "temperature": runner.EVAL_TEMPERATURE,
+        "thinking": providers.THINKING if args.thinking is None else args.thinking,
         "max_turns": args.max_turns,
         "matchups": ["%s vs %s" % m for m in matchups],
         "case_ids": [c.case_id for c in ordered],
@@ -121,6 +130,10 @@ def main(argv=None) -> int:
                     help="含【name】...sk-xxx 的文件；默认只读环境变量")
     ap.add_argument("--only-category", nargs="*", default=None)
     ap.add_argument("--both-sides", action="store_true", help="正反两个方向都跑")
+    ap.add_argument("--thinking", type=lambda v: v.lower() in ("1", "true", "on"),
+                    default=None, choices=[True, False],
+                    help="覆盖 thinking 开关（默认沿用 config）。用于 A/B："
+                         "--thinking true / --thinking false")
     ap.add_argument("--verify", metavar="PATH", default=None)
     ap.add_argument("--cases-only", action="store_true")
     ap.add_argument("--probe", action="store_true")

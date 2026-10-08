@@ -120,17 +120,23 @@ def load_keys(api_file: Optional[str] = None) -> Dict[str, str]:
     return keys
 
 
-def build_adapter(name: str, api_key: str) -> BaseLLMAdapter:
-    """构造仓库既有的适配器实例（不新增 provider 分支）。"""
+def build_adapter(name: str, api_key: str, thinking: Optional[bool] = None) -> BaseLLMAdapter:
+    """构造仓库既有的适配器实例（不新增 provider 分支）。
+
+    thinking 传 None 表示沿用 THINKING 默认（与 config 一致）；
+    显式传 True/False 用于 A/B 对照。
+    """
+    if thinking is None:
+        thinking = THINKING
     meta = PROVIDERS[name]
     if name == "deepseek":
         from src.llm_adapters.deepseek_adapter import DeepSeekAdapter
         return DeepSeekAdapter(api_key=api_key, model=meta["model"],
-                                base_url=meta["base_url"], thinking=THINKING)
+                                base_url=meta["base_url"], thinking=thinking)
     if name == "mimo":
         from src.llm_adapters.mimo_adapter import MiMoAdapter
         return MiMoAdapter(api_key=api_key, model=meta["model"],
-                           base_url=meta["base_url"], thinking=THINKING)
+                           base_url=meta["base_url"], thinking=thinking)
     raise ValueError("unknown provider: %s" % name)
 
 

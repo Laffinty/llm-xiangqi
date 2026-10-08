@@ -58,12 +58,16 @@ async def play_case(
     max_turns: int = 60,
     timeout: int = 300,
     temperature: float = EVAL_TEMPERATURE,
+    thinking: Optional[bool] = None,
 ) -> Dict:
-    """跑一局，返回一条原始记录。"""
+    """跑一局，返回一条原始记录。
+
+    thinking=None 表示沿用 config（providers.THINKING）。
+    """
     red_adapter = providers.InstrumentedAdapter(
-        providers.build_adapter(red_provider, keys[red_provider]))
+        providers.build_adapter(red_provider, keys[red_provider], thinking=thinking))
     black_adapter = providers.InstrumentedAdapter(
-        providers.build_adapter(black_provider, keys[black_provider]))
+        providers.build_adapter(black_provider, keys[black_provider], thinking=thinking))
 
     red = build_agent(1, red_adapter, "Red", "EvalRed", temperature)
     black = build_agent(2, black_adapter, "Black", "EvalBlack", temperature)
