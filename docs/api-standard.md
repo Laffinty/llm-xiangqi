@@ -1,9 +1,51 @@
 # LLM-Xiangqi 统一通信 API 标准
 
-> 版本: 0.3.0
-> 最后更新: 2026-03-29
+> 版本: 0.4.0
+> 最后更新: 2026-10-08
+> 状态: **部分为设计态**（Skill 模式契约尚未实现，逐节标注）
 
 本文档定义主程序（Game Controller / Agent）与 LLM 适配器（Adapter）之间的统一通信契约，以及 Web 3D 模块的 WebSocket 通信协议，确保任意 LLM 后端均可无缝接入。
+
+> **v0.4.0 变更说明**
+> 本次更新引入 Skill 模式契约（LLM ↔ 棋盘实测的结构化交互协议），并修正 v0.3.0 描述中一处**协议性错误**：
+> v0.3.0 只描述了 `chat()` 的**输入**形式，未约束**输出**序列如何构造——而实现与那个形式不一致（详见 §3.4）。
+> 新契约的正确性依据、实施顺序与验收门禁，见 `docs/skill-mode-design.md`（`PLAN-SKILL-001`）。
+
+---
+
+## 0. 阅读指引
+
+### 0.1 状态标记
+
+本文档各节标注实现状态。**读取时以标记为准，不要以章节存在即认为代码可用。**
+
+| 标记 | 含义 |
+|---|---|
+| `现网` | 当前代码即如此实现，可直接依赖 |
+| `设计态` | Skill 模式目标契约，**尚未实现**，不可依赖 |
+| `已废弃` | 保留仅为迁移参照，新代码禁止使用 |
+
+各节状态速查：
+
+| 章节 | 状态 | 备注 |
+|---|---|---|
+| §1 架构概览 | `现网` + `设计态` 并列 | 目标架构见 `PLAN-SKILL-001` §3 |
+| §2 核心数据结构 | `现网` | `BoardSnapshot` 为新增，见 §2.6（`设计态`） |
+| §3 适配器层 | `现网` + `设计态` | `tool_calls.id` 与消息序列契约尚未实现 |
+| §4 协议原理 | `现网` | 本次不变 |
+| §5 Agent 层 | `现网` + `设计态` | 协议合规要求见 §5.5 |
+| §6 用户调用 | `现网` | 本次不变 |
+| §7 Skill 层 | `设计态` | **替换**原 MCP 工具层，原内容降为 §7.5 `已废弃` |
+| §8 ICCS 规范 | `现网` | 不变 |
+| §9 新增适配器指南 | `现网` | 不变 |
+| §10 Observer API | `现网` | 不变 |
+| §11 错误处理 | `现网` + `设计态` | Skill 层错误语义见 §7.4 |
+| §13 Web 3D | `现网` | 不变 |
+
+### 0.2 与其它文档的关系
+
+- `docs/skill-mode-design.md` — **实施计划与验收门禁**，本文档只定义「契约长什么样」
+- `docs/history/optimization-plan.md` — **已停用**，仅作缺陷史参考
 
 ---
 
@@ -59,6 +101,8 @@ BaseLLMAdapter (ABC)                    ← src/llm_adapters/base_adapter.py
 
 ### 1.3 数据流
 
+**`现网`（当前实现）**
+
 ```
 GameState → LLMAgent.think() → [PromptBuilder → Adapter.chat()] → AgentResult
                    │                       │
@@ -66,6 +110,25 @@ GameState → LLMAgent.think() → [PromptBuilder → Adapter.chat()] → AgentR
                    │                       │
                    └── ToolExecutor ← tool_calls ┘
 ```
+
+> ⚠️ 此图描述的是 `现网` 形态。**其中 `ToolExecutor ← tool_calls` 这一支在实践中是断的**：模型发出的 assistant 消息从不写回、工具结果被伪装成 user 消息、`ToolCallDict` 没有 `id` 字段。详见 §3.4。
+
+**`设计态`（Skill 模式目标形态）**
+
+```
+Engine ──► BoardSnapshot ──► SkillRouter ──► Skill Set ──► LLMAgent.think()
+                 │                │                              │
+                 │                └──► SkillExecutor(只读技能)        │
+                 │                                                       ▼
+                 └─────────────────────────────► Adapter.chat()
+                                                                                        │
+                                                                          SkillExecutor.commit_move
+                                                                                        │
+                                                                                        ▼
+                                                                            Event ──► Engine(下一回合)
+```
+
+`commit_move` 是**唯一**写入棋盘的技能，其余技能全部只读。
 
 ---
 
@@ -188,6 +251,34 @@ class ValidationResult:
 
 ---
 
+### 2.6 BoardSnapshot（结构化局面视图）—— `设计态`
+
+Skill 模式下 `GameState` 不变，但模型实际看到的内容由 `BoardSnapshot` 产出。
+**添加结构化字段，不移除 ASCII 棋盘**（理由见 `PLAN-SKILL-001` 裁决 `D-04`）。
+
+```python
+@dataclass
+class BoardSnapshot:
+    ply: int                                  # 已走回合数
+    turn: Literal["Red", "Black"]
+    phase: Literal["opening", "middlegame", "endgame"]
+    fen: str
+    ascii_board: str                          # 保留（现网同字段）
+    material: Dict[str, int]                  # {"Red": 12, "Black": 11}
+    in_check: bool
+    check_side: Optional[Literal["Red", "Black"]]
+    legal_move_count: int
+    legal_moves: List[str]                    # ICCS
+    annotated_moves: List[Dict[str, Any]]     # 语义标注（现网同字段）
+    last_move: Optional[Dict[str, str]]       # {"iccs": "h2e2", "by": "Agent1"}
+    repetition_warning: bool
+    recent_history: List[str]                 # 最近 K 手（不是全量历史）
+```
+
+`recent_history` 取代 `GameState.game_history`（全量）——与 §5.5 的每回合重置一致。
+
+---
+
 ## 3. LLM 适配器层 API
 
 ### 3.1 BaseLLMAdapter（适配器基类接口）
@@ -285,15 +376,29 @@ class LLMResponse:
         return self.tool_calls is not None and len(self.tool_calls) > 0
 ```
 
-**tool_calls 格式** (统一后):
+**tool_calls 格式**（`设计态`）:
+
+> `id` 字段为新增。**当前现网 `ToolCallDict` 仅有 `{name, arguments}`，协议上无法回填工具结果**。
+> 实施见 `docs/skill-mode-design.md` 工作项 `W-01`。
+
 ```python
 [
     {
-        "name": "validate_and_explain",          # 工具名称
-        "arguments": {"fen": "...", "move": "h2e2"}  # 工具参数 (已解析为dict)
+        "id": "call_abc123",                            # 供应商返回的调用标识，回填结果时必须原样送回
+        "name": "validate_and_explain",                 # 工具名称
+        "arguments": {"fen": "...", "move": "h2e2"}   # 工具参数 (已解析为dict)
     }
 ]
 ```
+
+**逆向映射**（归一后）：
+
+| 供应商字段 | 协议 | 映射到 |
+|---|---|---|
+| `message.tool_calls[].id` | OpenAI 兼容 | `ToolCallDict["id"]` |
+| `tool_use` block `id` | Anthropic 兼容 | `ToolCallDict["id"]` |
+
+---
 
 ### 3.3 适配器职责矩阵
 
@@ -309,6 +414,32 @@ class LLMResponse:
 | SDK | openai (async) | openai (async) | anthropic (sync→async) |
 
 > **性能备注**: Anthropic 适配器使用 `run_in_executor` 包装同步 SDK。当前场景下仅 2 个 Agent 串行调用，不构成瓶颈。如需高并发，可考虑使用官方 async SDK（发布后替换）。
+
+---
+
+### 3.4 消息序列契约（`设计态`）
+
+**一次工具调用循环的完整消息序列：**
+
+```
+[0] {"role": "system",    "content": "…"}
+[1] {"role": "user",      "content": "当前局面…"}
+[2] {"role": "assistant", "content": "", "tool_calls": [
+        {"id": "call_abc123", "name": "board_inspect", "arguments": {"detail": "concise"}}
+    ]}
+[3] {"role": "tool", "tool_call_id": "call_abc123", "content": "{...}"}   # 与 [2] 的 id 对应
+[4] {"role": "assistant", "content": "..."}
+```
+
+**三条强制要求：**
+
+| # | 要求 | 当前状态 |
+|---|---|---|
+| R-1 | assistant 消息必须原样写回历史，含 `tool_calls` 完整字段 | `待实现`（仓库中 `assistant` 仅出现在一条 docstring 里） |
+| R-2 | 工具结果必须以 `role:"tool"` + `tool_call_id` 送回 | `待实现`（结果被渲染成 `role:"user"`） |
+| R-3 | 不得出现连续两条 `role:"user"` | `待实现`（Anthropic 协议下非法） |
+
+**运行时约束**：每回合完成后重置历史（`Agent.reset()`）。现网中 `reset()` 零调用点，历史跨回合无限累积。
 
 ---
 
@@ -552,6 +683,30 @@ class AgentConfig:
 
 ---
 
+### 5.5 协议合规要求（`设计态`）
+
+`LLMAgent` / `BaseAgent` 实现必须满足 §3.4 的 R-1/R-2/R-3，并在每回合结束时调用 `reset()`。
+
+```python
+class BaseAgent(ABC):
+    async def think(self, game_state: GameStateDict) -> AgentResult:
+        # R-1/R-2: 工具调用必须完整回写 assistant + tool 消息
+        # R-3: 消息序列不得出现连续 user
+        ...
+
+    def reset(self) -> None:
+        # 每回合结束后必须调用
+        ...
+```
+
+**Skill 模式下的 `think()` 契约**（`设计态`）：
+
+1. 不再从自由文本中用正则提取走步——走步由 §7.6 的决策契约产出，合法性由 schema 保证（而非重试保证）
+2. `game_state` 仍作为唯一输入，但内容由 `BoardSnapshot` 产出（§2.6）
+3. 输出 `AgentResult` 的字段不变，保持下游兼容
+
+---
+
 ## 6. 用户调用方法
 
 ### 6.1 快速开始
@@ -660,9 +815,82 @@ print(response.tool_calls)  # 工具调用（如有）
 
 ---
 
-## 7. MCP 工具层 API
+## 7. Skill 层 API（`设计态`）
 
-### 7.1 BaseTool（工具基类）
+> **本节为 Skill 模式目标契约，尚未实现。**
+> 原「MCP 工具层」已降级为 `已废弃`（§7.5）。其实现存在两处已核实缺陷：
+> ① LLM 实际看到的 schema 来自 `prompt_builder.py` 的硬编码常量，与工具注册表无关；
+> ② `ToolExecutor.get_tool_schemas()` 零调用点。
+> 迁移计划见 `docs/skill-mode-design.md` 工作项 `W-06`。
+
+### 7.1 Skill 分类
+
+Skill 统一注册于 `SkillRegistry`，用 `kind` 区分两个面：
+
+| kind | 形态 | 谁决定何时激活 |
+|---|---|---|
+| `knowledge` | `skills/<name>/SKILL.md` 目录 + YAML frontmatter | `SkillRouter` 依 `when` 条件**确定性**激活 |
+| `action` | JSON-Schema 约束的函数 | `SkillRouter` 决定是否暴露给模型 |
+
+**路由是确定性的，不由模型自选。** 象棋是全可观测、回合结构确定的 workflow 而非 agent——让模型自己决定调哪个工具，等于花钱、花延迟去重新推导引擎已知的事实。裁决依据见 `PLAN-SKILL-001` 裁决 `D-03`。
+
+### 7.2 Skill 注册表接口（`设计态`）
+
+```python
+@dataclass
+class SkillSpec:
+    name: str                                  # ≤64 字符，小写+连字符，须与目录同名
+    description: str                           # ≤1024 字符，第三人称，须同时说明「做什么」与「何时用」
+    kind: Literal["knowledge", "action"]
+    side_effect: Literal["none", "mutating"]
+    when: Optional[List[Rule]] = None          # 仅 knowledge：确定性激活条件
+    schema: Optional[Dict[str, Any]] = None    # 仅 action：JSON Schema
+
+class SkillRegistry:
+    def list_manifest(self) -> List[Dict[str, str]]:
+        """返回 L1 元数据（name/description/when 摘要），供 system prompt 常驻。"""
+
+    def resolve(self, snapshot: BoardSnapshot) -> List[SkillSpec]:
+        """依据局面特征求值 when，返回本回合激活的技能集合。"""
+
+    def schemas_for(self, skills: List[SkillSpec]) -> List[Dict[str, Any]]:
+        """仅返回 kind=="action" 的 schema，供 adapter.chat(tools=...) 使用。"""
+
+    def load_body(self, name: str) -> str:
+        """按需载入 L2（SKILL.md 正文）。"""
+```
+
+**三级渐进披露**（采用 Anthropic 的分级约定）：
+
+| 级别 | 内容 | 载入时机 | 预算 |
+|---|---|---|---|
+| L1 | frontmatter：`name` / `description` / `when` | 启动即驻留 system prompt | ~100 token / 项 |
+| L2 | `SKILL.md` 正文：程序性知识 | 条件命中时载入 | < 5k token |
+| L3 | `references/*.md`：深度细节 | SKILL.md 显式引用时 | 按需 |
+
+### 7.3 标准动作技能（`设计态`）
+
+| name | side_effect | 参数 | 说明 |
+|---|---|---|---|
+| `board_inspect` | `none` | `detail: concise \| detailed` | 只读。`concise` 可节约 2/3 token |
+| `opening_probe` | `none` | `fen, plies` | 只读。开局库查询 |
+| `evaluate_candidates` | `none` | `moves[], depth, budget_ms` | 只读。**批量**评估候选走步集 |
+| `line_simulate` | `none` | `move` | 只读，**必须沙箱执行**，不得影响真实局面 |
+| `commit_move` | **`mutating`** | `move` | **唯一写入**。schema 以 `enum` 限定合法走步 |
+
+动作技能一律携带注解（对齐 MCP `annotations` 语义）：`readOnlyHint` / `destructiveHint`。
+
+### 7.4 错误返回语义
+
+采用 MCP 的 `isError` 语义：**工具跑通了但未满足请求**（如「该局面无开局库记录」）→ 返回**可恢复的业务错误**，让模型能换个策略；参数类型错等协议层错误→ 硬失败。
+
+错误消息必须**可操作**。禁止返回透明错误码或堆栈——它会迫使 Agent 猜测（Anthropic 明确建议）。
+
+### 7.5 旧 MCP 工具层（`已废弃`）
+
+以下为 v0.3.0 契约，**新代码禁止使用**，保留仅为迁移参照。
+
+### 7.5.1 BaseTool（工具基类）
 
 ```python
 class BaseTool(ABC):
@@ -674,7 +902,7 @@ class BaseTool(ABC):
     def get_schema(self) -> Dict[str, Any]: ...
 ```
 
-### 7.2 ToolExecutor（工具执行器）
+### 7.5.2 ToolExecutor（工具执行器）
 
 ```python
 class ToolExecutor:  # 单例
@@ -689,7 +917,7 @@ class ToolExecutor:  # 单例
     def get_available_tools(self) -> List[str]: ...
 ```
 
-### 7.3 标准工具定义
+### 7.5.3 旧标准工具定义
 
 #### evaluate_position
 
@@ -720,6 +948,31 @@ class ToolExecutor:  # 单例
 | 参数 | `fen: str` (必填), `move: str` (必填) |
 | 返回 | `{success: bool, fen: str, move: str, valid: bool, explanation: str}` |
 | 状态 | **已实现** |
+
+---
+
+### 7.6 决策契约（`设计态`）
+
+模型对「走哪一步」的响应遵循固定 schema，**合法走步以 `enum` 写入**，使模型物理上无法输出非法走步：
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "move":       {"type": "string", "enum": ["<合法走步1>", "...", "共 N 项"]},
+    "thought":    {"type": "string"},
+    "confidence": {"type": "number"},
+    "skill_used": {"type": "string"}
+  },
+  "required": ["move", "thought", "confidence", "skill_used"],
+  "additionalProperties": false
+}
+```
+
+启用 strict 模式时，schema 必须满足三条硬性要求，否则请求被供应商拒绝：
+每个 object 必须声明 `additionalProperties: false`；`properties` 中每个字段都必须列入 `required`；可选字段用类型联合表达（如 `["string", "null"]`）。
+
+**降级路径为强制项**：DeepSeek / MiMo / MiniMax 对 strict 的支持不一致。供应商不支持时，回退到非 strict function calling + 本地 schema 校验 + 单次纠错，且**降级路径必须单独评测**（否则「strict 生效」这个假设永远无法证伪）。
 
 ---
 
@@ -905,10 +1158,12 @@ class LLMAgentGameController:
 |------|---------|---------|
 | Adapter | API 超时 | 指数退避重试 (OpenAI) / 递增超时+退避 (Anthropic), 最终 raise |
 | Adapter | API 返回格式异常 | 返回 `LLMResponse(content="", thought=None, tool_calls=None)` |
-| Agent | LLM 输出非法走步 | `add_correction_feedback()` + 重试 (最多3次) |
+| Agent | LLM 输出非法走步 | `现网`：`add_correction_feedback()` + 重试 (最多3次)。`设计态`：由 §7.6 schema 防御，不应发生 |
 | Agent | LLM 未输出可解析的走步 | 返回 `AgentResult(success=False, error="...")` |
 | Controller | 走步不在 legal_moves 中 | 返回 `MoveResult(success=False, error="Illegal move: ...")` |
 | Tool | 工具执行异常 | 返回 `{success: False, error: str(e)}` |
+| Skill | `现网`：无工具结果回填通道（assistant 不写回、无 `tool_call_id`） | `设计态`：以 §3.4 R-1/R-2 防御，工作项 `W-01` |
+| Skill | `设计态`：业务失败（如无开局库记录） | 返回可恢复错误，使模型能换策略（§7.4） |
 | Web 3D | WebSocket 连接断开 | 客户端自动重连 (指数退避, 最大30s间隔) |
 | Web 3D | 消息解析失败 | 服务端忽略无效消息, 客户端记录 warning |
 
@@ -918,6 +1173,7 @@ class LLMAgentGameController:
 
 | 版本 | 日期 | 变更内容 |
 |------|------|---------|
+| 0.4.0 | 2026-10-08 | 引入 Skill 模式契约（§7 重写：Skill 分类/注册表/动作技能/决策契约，原 MCP 工具层降为 §7.5 已废弃）；新增 §0 阅读指引与状态标记、§2.6 BoardSnapshot、§3.4 消息序列契约（含待实现的 R-1/R-2/R-3）、§5.5 协议合规要求；更新 §1.3 数据流为现网+设计态双图、§11 错误表。**更正一处描述错误**：旧版未描述输出序列的实际构造方式 |
 | 0.3.0 | 2026-03-29 | 新增 Web 3D WebSocket API (§13)；统一 `turn` 字段大小写为 `"Red"/"Black"`；补充 WebSocket 错误码和协议版本；补充 Observer sync/async 兼容说明 |
 | 0.2.0 | 2026-03-27 | 初始版本，覆盖 Agent/Adapter/MCP/Observer 接口 |
 
