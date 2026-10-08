@@ -16,4 +16,8 @@ llm:
   base_url: "https://api.xiaomimimo.com/v1"
   temperature: 0.7
   max_tokens: 2048
+  # 深度求是 thinking model：开着思维链会吃光 max_tokens，content 返回空，
+  # 走步只能从截断的思考里正则刨（docs/skill-mode-design.md F-017/F-018）。
+  # 实测关闭后 7.4s/手、content 必非空、走步合法；开启则 58-130s/手 且可能截断。
+  thinking: false
   timeout: 60

@@ -15,6 +15,9 @@ from src.llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
 
 # 2026-10-08 实测结论（证据见 docs/skill-mode-design.md F-011~F-016）。
 # 这些不是文档摘抄，是探测结果。
+# 与 config/agentX_config.yaml 保持一致。None = 不干预供应商默认。
+THINKING: Optional[bool] = False
+
 PROVIDERS: Dict[str, dict] = {
     "deepseek": {
         "model": "deepseek-flash",
@@ -122,10 +125,12 @@ def build_adapter(name: str, api_key: str) -> BaseLLMAdapter:
     meta = PROVIDERS[name]
     if name == "deepseek":
         from src.llm_adapters.deepseek_adapter import DeepSeekAdapter
-        return DeepSeekAdapter(api_key=api_key, model=meta["model"], base_url=meta["base_url"])
+        return DeepSeekAdapter(api_key=api_key, model=meta["model"],
+                                base_url=meta["base_url"], thinking=THINKING)
     if name == "mimo":
         from src.llm_adapters.mimo_adapter import MiMoAdapter
-        return MiMoAdapter(api_key=api_key, model=meta["model"], base_url=meta["base_url"])
+        return MiMoAdapter(api_key=api_key, model=meta["model"],
+                           base_url=meta["base_url"], thinking=THINKING)
     raise ValueError("unknown provider: %s" % name)
 
 

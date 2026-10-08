@@ -29,7 +29,8 @@ class DeepSeekAdapter(OpenAICompatibleAdapter):
         timeout: int = 30,
         max_retries: int = 3,
         temperature: float = 0.7,
-        max_tokens: int = 2048
+        max_tokens: int = 2048,
+        thinking: Optional[bool] = None
     ):
         super().__init__(
             api_key=api_key,
@@ -38,5 +39,6 @@ class DeepSeekAdapter(OpenAICompatibleAdapter):
             timeout=timeout,
             max_retries=max_retries,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            thinking=thinking
         )

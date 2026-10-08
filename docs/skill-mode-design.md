@@ -256,6 +256,36 @@ tool_choice = "required"  -> 400 {"message": "Thinking mode does not support thi
 `length`，则本条成立。
 
 
+### F-018 加 token 预算不能根治，关掉 thinking 才是 —— `已核实`
+
+在真实对局 prompt 上做 6 组扫描（`endgame_m14_p059`，2026-10-08）：
+
+| provider | thinking | max_tokens | finish | 耗时 | content | 走步合法 |
+|---|---|---|---|---|---|---|
+| DeepSeek | **OFF** | 2048 | `stop` | **2.3s** | 318 | 是 |
+| DeepSeek | ON | 8192 | `length` | 41.1s | **0** | 否 |
+| DeepSeek | ON | 16384 | `stop` | 51.3s | 399 | 是 |
+| MiMo | **OFF** | 2048 | `stop` | **7.4s** | 219 | 是 |
+| MiMo | ON | 8192 | `stop` | **129.6s** | 298 | 是 |
+| MiMo | ON | 16384 | `stop` | 58.2s | 262 | 是 |
+
+**结论一**：单纯加大 `max_tokens` 只是把「截断」换成「慢」。DeepSeek 在 8192 仍然截断，
+要到 16384 才写得出答案，单手 51s——一局 200 手就是 2.8 小时。
+
+**结论二**：`thinking=OFF` 快 10–20 倍，content 必非空，走步合法，token 可预测。
+
+**结论三（代价，必须记账）**：thinking 开启时延迟**高度不可预测**——MiMo 8192 用了 129.6s，
+而 16384 反而只用 58.2s。因为它是「想完就停」而非「用满预算」。
+这意味着开着 thinking 的评测**耗时方差极大**，无法据预算估算。
+
+**未回答的问题（不要假装已解决）**：关掉 thinking 是否削弱棋力，本文没有测。
+prompt 本身要求模型在 `thought` 字段里做四步分析，那部分推理仍然存在，
+但供应商的 `reasoning_content` 被关掉了。**棋力影响属于待测项，不是已知结论。**
+
+证伪命令：把 `config/agentX_config.yaml` 的 `thinking` 改为 true 后重跑 W-00 验收脚本，
+若 content 仍非空且耗时相近，则本条结论二作废。
+
+
 ---
 
 ## §2 裁决
@@ -540,28 +570,36 @@ LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的�
 
 ---
 
-### W-00 thinking token 预算 —— `待做` ★**先于 W-02 基线采集**
+### W-00 thinking 开关 —— `完成`
 
 **依赖**：无
-**非目标**：不改 prompt 文本，不改决策契约，不引入 skill。**只调 token 预算。**
+**非目标**：不改 prompt 文本，不改决策契约，不引入 skill。
 
-**为什么排在最前**：`F-017` 证明当前 `max_tokens: 2048` 让模型永远写不出答案，
-走步全靠从截断的思考里刨。在这个状态下采集的基线，测的是**一个坏掉的系统**；
-而它作为「before」仍然有价值——只是必须**明确知道** before 坏在哪。
-先修预算再采基线，后续 `W-03` 的收益才不会被这个噪声淹没。
+**为什么排在最前**：`F-017` 证明模型永远写不出答案，走步全靠从截断的思考里刨。
+在这个状态下采集的基线，测的是一个坏掉的系统。
 
-**改动面**：`config/agent1_config.yaml`、`config/agent2_config.yaml` 的 `max_tokens`
-（必要时同步 `src/llm_adapters/*_base_adapter.py` 的默认值 2048）
+**原计划（已被证据推翻）**：只调 `max_tokens`。
+**实测结论（F-018）**：加大预算只是把「截断」换成「慢」；真正的修法是**关掉 thinking**。
 
-**验收命令**：
-```
-rg -n "max_tokens" config/ src/llm_adapters/
-```
-复跑 `F-017` 的诊断脚本，要求 `finish_reason != length` 且 `content` 非空。
+**改动面**（已落地并通过验收）：
+- `src/llm_adapters/base_adapter.py` — 新增 `thinking: Optional[bool]`，`None` = 不干预
+- `src/llm_adapters/openai_base_adapter.py` — `thinking` 非 None 时注入
+  `extra_body={"thinking": {"type": "enabled"|"disabled"}}`
+- `src/llm_adapters/deepseek_adapter.py` / `mimo_adapter.py` — 透传
+- `game.py` — `_create_adapter` 读 `llm_config["thinking"]`
+- `config/agent1_config.yaml` / `agent2_config.yaml` — `thinking: false` + 实测数据注释
+- `tests/eval/providers.py` — 评测沿用同一开关，保证基线反映真实配置
+
+**验收结果**（走生产路径 `game.py::_create_adapter` + 真实 config，2026-10-08）：
+
+| config | finish | 耗时 | content | 走步合法 |
+|---|---|---|---|---|
+| agent1 (DeepSeek) | `stop` | 2.9s | 423 | 是 `g4g5` |
+| agent2 (MiMo) | `stop` | 36.8s | 208 | 是 `e5e6` |
 
 **反向守卫**：`text_only_ratio` 必须下降；`completion_tokens == max_tokens` 的次数必须归零。
 
-**注意**：加深预算会拉长每手耗时（F-017 实测约 29 秒/手），采集基线前需重估总时长。
+**遗留**：棋力是否因此下降，属**待测项**（见 F-018「未回答的问题」），不得当作已知结论。
 
 ---
 
@@ -685,7 +723,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 
 | 工作项 | 状态 | 门禁结果 | 日期 |
 |---|---|---|---|
-| `W-00` thinking token 预算 | `待做` | — | — |
+| `W-00` thinking 开关 | `完成` | F-017 消解：两家 `finish=stop`、content 非空、走步合法 | 2026-10-08 |
 | `W-02` 评测基线 | `待做` | — | — |
 | `W-01` 协议修复 | `待做` | — | — |
 | `W-03` 决策契约 | `待做` | — | — |
@@ -695,7 +733,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 
 **执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → `W-03` → `W-04` → `W-05` → `W-06`。
 
-`W-00` 是后补的：它是在 `W-02` 的实跑中才暴露的（F-017）。harness 建好后第一件事
+`W-00` 是后补的（harness 建好后第一件事就是发现了它）：它是在 `W-02` 的实跑中才暴露的（F-017）。harness 建好后第一件事
 就是发现了它——这本身就是「先建度量」这条裁决（D-08）的收益证明。
 
 ---

@@ -33,6 +33,7 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
         max_retries: int = 3,
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        thinking: Optional[bool] = None,
     ):
         super().__init__(
             api_key=api_key,
@@ -42,6 +43,7 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             max_retries=max_retries,
             temperature=temperature,
             max_tokens=max_tokens,
+            thinking=thinking,
         )
 
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
@@ -61,6 +63,14 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             "temperature": kwargs.get("temperature", self.temperature),
             "max_tokens": kwargs.get("max_tokens", self.max_tokens),
         }
+
+        # 深度求两家都是 thinking model。开着 thinking 时思维链会吃光
+        # max_tokens，content 返回空字符串、走步只能从截断的思考里正则刨
+        # （见 docs/skill-mode-design.md 事实 F-017）。thinking=None 表示
+        # 不干预，交给供应商默认行为。
+        thinking = kwargs.get("thinking", self.thinking)
+        if thinking is not None:
+            params["extra_body"] = {"thinking": {"type": "enabled" if thinking else "disabled"}}
 
         if tools:
             params["tools"] = tools

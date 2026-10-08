@@ -66,6 +66,7 @@ def _create_adapter(llm_config: dict) -> BaseLLMAdapter:
         max_retries=llm_config.get("max_retries", 3),
         temperature=llm_config.get("temperature", 0.7),
         max_tokens=llm_config.get("max_tokens", 2048),
+        thinking=llm_config.get("thinking"),
     )
 
 

@@ -58,7 +58,8 @@ class BaseLLMAdapter(ABC):
         timeout: int = 30,
         max_retries: int = 3,
         temperature: float = 0.7,
-        max_tokens: int = 2048
+        max_tokens: int = 2048,
+        thinking: Optional[bool] = None
     ):
         self.api_key = api_key
         self.model = model
@@ -67,6 +68,9 @@ class BaseLLMAdapter(ABC):
         self.max_retries = max_retries
         self.temperature = temperature
         self.max_tokens = max_tokens
+        # None = 不干预，用供应商默认；True/False = 显式开关思维链。
+        # 见 docs/skill-mode-design.md 事实 F-017 / F-018。
+        self.thinking = thinking
     
     async def __aenter__(self):
         """异步上下文管理器入口"""
