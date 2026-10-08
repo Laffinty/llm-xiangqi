@@ -124,7 +124,11 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
                     )
                 except json.JSONDecodeError:
                     args = {}
-                tool_calls.append({"name": tc.function.name, "arguments": args})
+                tool_calls.append({
+                    "id": getattr(tc, "id", None) or "",
+                    "name": tc.function.name,
+                    "arguments": args,
+                })
 
         # 提取 thought（reasoning_content），适用于 GLM、MiMo 等推理模型
         thought = None

@@ -82,7 +82,11 @@ class PromptBuilder:
 
         self.system_prompt = system_prompt
         self.history: List[Dict[str, str]] = []
-        self.tool_results: List[Dict[str, Any]] = []
+        self.tool_exchanges: List[Dict[str, Any]] = []
+        self.assistant_notes: List[str] = []
+        # 纠错反馈并入下一条 user 消息，而不是单独追加一条（否则产生连续 user 消息）
+        self.correction: Optional[str] = None
+        self.current_user_turn: Optional[str] = None
         self.tools: List[Dict[str, Any]] = list(MCP_TOOLS)
 
     @classmethod
@@ -153,6 +157,8 @@ class PromptBuilder:
 
         # 构建用户消息
         user_content = self._format_game_state(game_state)
+        # 记住本轮：否则 _continue_chat 重建消息时会丢掉它，对话以 assistant 开头（非法）。
+        self.current_user_turn = user_content
 
         return self.build_messages(system_prompt, user_content)
 
@@ -356,61 +362,91 @@ class PromptBuilder:
         return self.build_messages(self.system_prompt, user_content)
 
     def build_messages(
-        self, system_prompt: str, user_content: str
-    ) -> List[Dict[str, str]]:
-        """构建消息列表"""
-        messages = []
+        self,
+        system_prompt: str,
+        user_content: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """构建消息列表。
+
+        协议顺序：system -> history -> 本轮 user -> 工具调用往返 -> assistant 备注。
+
+        user_content 传 None 表示「继续上一轮」——工具循环里每一轮都追加
+        一条 user 消息会产生连续 user 消息，Anthropic Messages API 直接拒绝。
+        """
+        messages: List[Dict[str, Any]] = []
 
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
 
-        # 添加历史消息
         messages.extend(self.history)
 
-        # 添加工具结果
-        if self.tool_results:
-            tool_content = self._format_tool_results()
-            messages.append({"role": "user", "content": tool_content})
+        if user_content is None:
+            user_content = self.current_user_turn
 
-        # 添加当前用户消息
-        messages.append({"role": "user", "content": user_content})
+        # user turn must come BEFORE the tool exchanges: the exchanges are the
+        # continuation of this very turn. Putting it last would yield
+        # assistant -> tool -> user, i.e. consecutive user messages (R-3).
+        if user_content is not None:
+            if self.correction:
+                user_content = "%s\n\n%s" % (user_content, self.correction)
+            messages.append({"role": "user", "content": user_content})
+
+        for exchange in self.tool_exchanges:
+            messages.append(exchange["assistant"])
+            for tr in exchange["tools"]:
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tr.get("id", ""),
+                    "content": tr.get("content", ""),
+                })
+
+        for note in self.assistant_notes:
+            messages.append({"role": "assistant", "content": note})
 
         return messages
 
-    def _format_tool_results(self) -> str:
-        """格式化工具结果"""
-        if not self.tool_results:
-            return ""
+    def add_tool_exchange(
+        self,
+        assistant_msg: Dict[str, Any],
+        tool_results: List[Dict[str, Any]],
+    ) -> None:
+        """记录一次完整的工具调用往返。
 
-        lines = ["# 工具调用结果"]
-        for tr in self.tool_results:
-            tool_name = tr.get("tool", "unknown")
-            result = tr.get("result", {})
-            if isinstance(result, dict):
-                lines.append(f"\n## {tool_name}")
-                for key, value in result.items():
-                    lines.append(f"- {key}: {value}")
-            else:
-                lines.append(f"\n## {tool_name}: {str(result)[:200]}")
+        assistant_msg 必须是含 tool_calls 的 assistant 消息（带 id），
+        tool_results 每项必须带 id —— 二者一一对应才能被供应商协议接受。
+        """
+        self.tool_exchanges.append({
+            "assistant": assistant_msg,
+            "tools": [
+                {
+                    "id": tr.get("id", ""),
+                    "name": tr.get("tool", tr.get("name", "")),
+                    "content": tr.get("content", ""),
+                }
+                for tr in tool_results
+            ],
+        })
 
-        return "\n".join(lines)
+    def add_assistant_note(self, text: str) -> None:
+        """追加一条 assistant 说明（反思等）。
+
+        必须是 assistant 而非 user —— 反思是模型自己的话，
+        伪装成 user 会造成连续 user 消息。
+        """
+        self.assistant_notes.append(text)
 
     def add_to_history(self, role: str, content: str) -> None:
         """添加到历史"""
         self.history.append({"role": role, "content": content})
 
-    def add_tool_results(self, tool_results: List[Dict[str, Any]]) -> None:
-        """添加工具调用结果"""
-        self.tool_results.extend(tool_results)
-
-    def add_reflection(self, reflection: str) -> None:
-        """添加反思结果到历史"""
-        self.add_to_history("user", f"反思：\n{reflection}")
-
     def clear_history(self) -> None:
         """清除历史"""
         self.history = []
-        self.tool_results = []
+        self.tool_exchanges = []
+        self.assistant_notes = []
+        self.correction = None
+        self.current_user_turn = None
+
 
     def get_tools(self) -> List[Dict[str, Any]]:
         """获取工具定义"""

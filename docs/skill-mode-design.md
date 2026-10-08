@@ -335,6 +335,35 @@ DeepSeek 在 ON 档 3/3 全部 `finish_reason=length`、`content` 为空；MiMo 
 
 ---
 
+### F-021 协议闭环已实现并经真实供应商验收 —— `已核实`
+
+**单测只证明消息形状，供应商是否接受才是验收。** 用真实 API 走完整工具循环
+（2026-10-08），DeepSeek `deepseek-flash`：
+
+```
+[1] has_tool_calls      = True
+    tool_call id        = call_00_SQ1HHMIPzUUwjHHXPTuA2187
+    消息角色序列        = ['system','user','assistant','tool','assistant','tool','tool']
+    工具调用轮次        = 2 | tool 消息数: 3
+    tool_call_id 匹配   = True
+    角色交替合法        = system/user 开头, 无连续 user
+    最终 move           = h2e2   <- 从工具循环里成功提取出合法走步
+[2] 用构造出的序列再发一次请求 -> 服务端接受（content 623 chars）
+```
+
+MiMo `mimo-v2.6-flash`：本次采样未触发工具调用，该格无数据（不计失败）。
+但在更早一轮（修正 user 消息丢失之前）MiMo 曾产出 `tool_call id` 并被服务端接受，
+`tool_call_id` 匹配为 True——**未重验的是修正后的 user 开头顺序，不是协议本身**。
+
+**过程中发现并修掉的两个真 bug（都由这一步暴露，不是单测发现的）：**
+
+1. **`build_messages` 把 user 消息放在了最后**，产出 `assistant -> tool -> user`，
+   即连续 user 消息。user 回合属于本轮，必须排在工具往返**之前**。
+2. **`build_game_prompt` 只返回消息而不记录本轮**，导致 `_continue_chat` 重建时
+   **开头那条 user 消息直接丢失**，对话变成 assistant 开头。新增 `current_user_turn`。
+
+单测当时全绿——因为它们验证的是我写下的形状，而不是供应商的规则。
+
 ## §2 裁决
 
 以下 `D-xx` 均为 `已裁决`。每条附**被否决的方案及否决理由**——这是为了避免后来者重新提出同一方案。
@@ -585,38 +614,6 @@ strict 模式的三条硬性要求（OpenAI 明确规定，否则请求被拒）
 
 ---
 
-### W-02 对局评测基线 —— `待做` ★最高优先级
-
-**依赖**：无
-**非目标**：不提高棋力，不改任何决策逻辑，不改 prompt。
-
-**改动面**：新增 `tests/eval/`（harness + 固定局谱集 + 报告生成器）
-
-**做什么**：
-1. 固定开局局面集（含中局、残局、被将军、重复局面等边界样本）
-2. 同一模型 × N 局 × 固定 seed，记录：胜/和/负、平均 ply、非法走步率、平均 token、重试次数
-3. 输出可 diff 的 JSON 报告
-
-**验收命令**：
-```
-python -m tests.eval.run --games 20 --seed 42 --out baseline.json
-python -m tests.eval.run --verify baseline.json
-```
-
-**反向守卫**（已按实测修正——原「两次 live 跑逐字节一致」做不到）：
-LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的约束，
-写了也只会诱导后来人放宽到「差不多就行」。改为**三条可证明的确定性**：
-
-1. **序列化确定性**：报告文件内容 == 规范化重新序列化的输出
-2. **汇总纯函数性**：仅用 `raw` 重算 summary，整份报告与文件逐字节相同
-3. **局面集完整性**：全部 FEN 用 `RefereeEngine` 复验通过
-
-这三条由 `python -m tests.eval.run --verify <报告>` 一次跑完。
-
-**产出**：`docs/eval-baseline.json`（提交进仓库，作为所有后续阶段的比较基准）
-
----
-
 ### W-00 thinking 开关 —— `完成`
 
 **依赖**：无
@@ -653,30 +650,64 @@ LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的�
 ---
 
 
-### W-01 协议修复 —— `待做`
+### W-01 协议修复 —— `完成`
 
-**依赖**：无（可与 W-02 并行）
-**非目标**：不改 prompt 文本，不改工具集合，不改 skill 逻辑。
+**依赖**：无（与 W-00 顺序无关，但必须在 W-03 之前）
+**非目标**：不改 prompt 文本，不改工具集合，不引入 skill。**只修协议闭环。**
 
-**改动面**：
-- `src/llm_adapters/base_adapter.py` — `ToolCallDict` 增加 `id: str`
-- `src/llm_adapters/openai_base_adapter.py` — `_parse_response` 解析并保留 `tc.id`
-- `src/llm_adapters/anthropic_base_adapter.py` — `tool_use` block 同样保留 `id`
-- `src/agents/base_agent.py` — `execute_tool_loop` 写回 assistant 消息 + 追加 `role:"tool"` 消息
-- `src/agents/prompt_builder.py` — 删除 `tool_results` → user 消息的伪装路径（F-003）
-- `src/core/game_controller.py` — 每回合调用 `agent.reset()`
+**改动面**（实际落地）：
+- `src/llm_adapters/base_adapter.py` — `ToolCallDict` 与 `ToolCall` 增加 `id`
+- `src/llm_adapters/openai_base_adapter.py` — 解析并保留 `tc.id`
+- `src/llm_adapters/anthropic_base_adapter.py` — 保留 `block.id`；把 `role:"tool"`
+  转成 user 消息里的 `tool_result` 块，**并行结果合并成一条 user 消息**
+- `src/agents/prompt_builder.py` — 用 `tool_exchanges` 取代伪造的 user 消息；
+  消息顺序改为 system → history → **本轮 user** → 工具往返 → assistant 备注；
+  新增 `current_user_turn`（否则续生成时 user 开头会丢）
+- `src/agents/base_agent.py` — `execute_tool_loop` 写回 assistant+tool；
+  `_continue_chat` 不再追加 user 消息；纠错反馈改为挂起并入本轮
+- `src/core/game_controller.py` — `play_turn` 开头 `current_agent.reset()`
+- `tests/test_protocol_sequence.py` — **新增 7 条反向守卫**（此前协议合规无人看守）
+
+**验收结果**：见 `F-021`。真实供应商接受了构造出的序列，DeepSeek 完成 2 轮工具
+循环并提取出合法走步 `h2e2`。
+
+**过程中被实测推翻的**：单测全绿并不能证明协议正确。`build_messages` 的消息顺序
+与 `current_user_turn` 缺失两个 bug 都是靠真实请求暴露的，不是靠单测。
+
+**未做**：计划里写的 `python -m tests.eval.run --compare docs/eval-baseline.json`
+**尚未实现**——harness 目前只有 `--verify`（自洽性）与 `--restate`（重算），
+没有「与基线比 delta」。W-03 的门禁依赖它，需先补。
+
+
+### W-02 对局评测基线 —— `完成`
+
+**依赖**：无
+**非目标**：不提高棋力，不改任何决策逻辑，不改 prompt。
+
+**改动面**：新增 `tests/eval/`（harness + 固定局谱集 + 报告生成器）
+
+**做什么**：
+1. 固定开局局面集（含中局、残局、被将军、重复局面等边界样本）
+2. 同一模型 × N 局 × 固定 seed，记录：胜/和/负、平均 ply、非法走步率、平均 token、重试次数
+3. 输出可 diff 的 JSON 报告
 
 **验收命令**：
 ```
-rg -c "tool_call_id" src -g "*.py"                    # 必须 > 0（当前 F-002 为 0）
-python -m pytest tests/test_agents.py -q
-python -m tests.eval.run --compare docs/eval-baseline.json
+python -m tests.eval.run --games 20 --seed 42 --out baseline.json
+python -m tests.eval.run --verify baseline.json
 ```
 
-**反向守卫**：
-- 消息序列断言：任何一次请求中，`role:"tool"` 消息数必须等于前一 assistant 消息的 `tool_calls` 数，且 `tool_call_id` 与之匹配
-- 不得出现连续两条 `role:"user"`（Anthropic 协议非法，见 F-010）
-- 非法走步率不得高于基线
+**反向守卫**（已按实测修正——原「两次 live 跑逐字节一致」做不到）：
+LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的约束，
+写了也只会诱导后来人放宽到「差不多就行」。改为**三条可证明的确定性**：
+
+1. **序列化确定性**：报告文件内容 == 规范化重新序列化的输出
+2. **汇总纯函数性**：仅用 `raw` 重算 summary，整份报告与文件逐字节相同
+3. **局面集完整性**：全部 FEN 用 `RefereeEngine` 复验通过
+
+这三条由 `python -m tests.eval.run --verify <报告>` 一次跑完。
+
+**产出**：`docs/eval-baseline.json`（提交进仓库，作为所有后续阶段的比较基准）
 
 ---
 
@@ -775,13 +806,13 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 |---|---|---|---|
 | `W-00` thinking 开关 | `完成` | F-017 消解：两家 `finish=stop`、content 非空、走步合法 | 2026-10-08 |
 | `W-02` 评测基线 | `完成` | 7 局 0 胜负；3 局截断、4 局重复和棋；报告已自述该限制 | 2026-10-08 |
-| `W-01` 协议修复 | `待做` | — | — |
+| `W-01` 协议修复 | `完成` | F-021：真实供应商接受序列，DeepSeek 2 轮工具循环提取 `h2e2` | 2026-10-08 |
 | `W-03` 决策契约 | `待做` | — | — |
 | `W-04` BoardSnapshot | `待做` | — | — |
 | `W-05` 知识 skill | `待做` | — | — |
 | `W-06` 动作 skill | `待做` | — | — |
 
-**执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → `W-03` → `W-04` → `W-05` → `W-06`。
+**执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → **补 `--compare`** → `W-03` → `W-04` → `W-05` → `W-06`。
 
 `W-00` 是后补的（harness 建好后第一件事就是发现了它）：它是在 `W-02` 的实跑中才暴露的（F-017）。harness 建好后第一件事
 就是发现了它——这本身就是「先建度量」这条裁决（D-08）的收益证明。

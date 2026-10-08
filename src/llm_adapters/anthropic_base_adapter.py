@@ -69,18 +69,57 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
                 filtered_messages.append(msg)
 
         # 转换为 Anthropic content-blocks 格式
+        # Anthropic has no role:"tool": tool results must return inside a user
+        # message as tool_result blocks, and parallel results must be merged into
+        # ONE user message -- otherwise we emit consecutive user messages, which
+        # the Messages API rejects.
         anthropic_messages = []
+        pending_tool_results = []
+
+        def flush_tool_results():
+            if pending_tool_results:
+                anthropic_messages.append(
+                    {"role": "user", "content": list(pending_tool_results)}
+                )
+                pending_tool_results.clear()
+
         for msg in filtered_messages:
+            role = msg.get("role")
+
+            if role == "tool":
+                pending_tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": msg.get("content", ""),
+                })
+                continue
+
+            flush_tool_results()
+
+            if role == "assistant" and msg.get("tool_calls"):
+                blocks = []
+                if msg.get("content"):
+                    blocks.append({"type": "text", "text": msg["content"]})
+                for tc in msg["tool_calls"]:
+                    fn = tc.get("function", {})
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id", ""),
+                        "name": fn.get("name", ""),
+                        "input": fn.get("arguments", {}),
+                    })
+                anthropic_messages.append({"role": "assistant", "content": blocks})
+                continue
+
             content = msg.get("content", "")
             if isinstance(content, str):
                 anthropic_messages.append(
-                    {
-                        "role": msg["role"],
-                        "content": [{"type": "text", "text": content}],
-                    }
+                    {"role": role, "content": [{"type": "text", "text": content}]}
                 )
             elif isinstance(content, list):
-                anthropic_messages.append({"role": msg["role"], "content": content})
+                anthropic_messages.append({"role": role, "content": content})
+
+        flush_tool_results()
 
         params: Dict[str, Any] = {
             "model": self.model,
@@ -132,7 +171,11 @@ class AnthropicCompatibleAdapter(BaseLLMAdapter):
                 text_content.append(block.text)
             elif block.type == "tool_use":
                 tool_calls = tool_calls or []
-                tool_calls.append({"name": block.name, "arguments": block.input})
+                tool_calls.append({
+                    "id": getattr(block, "id", None) or "",
+                    "name": block.name,
+                    "arguments": block.input,
+                })
 
         return LLMResponse(
             content="\n".join(text_content),

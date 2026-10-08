@@ -168,6 +168,11 @@ class TestP0_3_FinalFenPropagation:
 
             def add_correction_feedback(self, *a, **kw):
                 pass
+            def reset(self):
+                # play_turn resets conversation history every turn (R-3);
+                # reset() is part of the agent contract.
+                pass
+
 
             async def think(self, state):
                 from src.agents.base_agent import AgentResult

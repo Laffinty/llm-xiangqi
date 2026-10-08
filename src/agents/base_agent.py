@@ -6,6 +6,7 @@ Agent基类
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import json
 from typing import Optional, List, Dict, Any, TypedDict, Literal
 from enum import Enum
 
@@ -102,70 +103,75 @@ class BaseAgent(ABC):
         """
         pass
 
+    MAX_TOOL_ITERATIONS = 3
+
     async def execute_tool_loop(
         self,
         initial_response: LLMResponse,
         tool_executor,
         game_state: GameStateDict
     ) -> AgentResult:
-        """执行工具调用循环直到得到最终走步
+        """工具调用循环，直到得到最终走步。
 
-        工具调用循环：
-        1. LLM请求工具调用
-        2. 执行工具（evaluate_position等）
-        3. 追加结果到历史
-        4. LLM反思（ReflAct风格，可选）
-        5. 重复直到得到最终走步
+        协议闭环（R-1 / R-2）：
+          1. 模型请求工具调用
+          2. 执行工具
+          3. **把 assistant(tool_calls) 与 role:"tool" 结果原样写回**
+          4. 继续生成（不追加新的 user 消息）
 
-        ReflAct研究表明：反思步骤可提升27.7%准确率
-
-        Args:
-            initial_response: LLM初始响应
-            tool_executor: 工具执行器
-            game_state: 游戏状态（用于走步验证）
-
-        Returns:
-            AgentResult: 最终决策结果
+        第 4 步的「不追加」不是省事：每轮追加一条 user 消息会产生连续
+        user 消息，Anthropic Messages API 直接拒绝。
         """
         current_response = initial_response
-        tool_results = []
-        legal_moves = game_state.get('legal_moves', [])
-        game_history = game_state.get('game_history', [])
+        tool_results: List[Dict[str, Any]] = []
 
-        # 最多3轮工具调用
-        for iteration in range(3):
+        for _ in range(self.MAX_TOOL_ITERATIONS):
             if not current_response.has_tool_calls():
                 break
 
-            # 执行所有工具调用
-            for tool_call in current_response.tool_calls:
-                result = await tool_executor.execute(
-                    tool_call["name"],
-                    tool_call["arguments"]
-                )
-                tool_results.append({
-                    "tool": tool_call["name"],
-                    "arguments": tool_call["arguments"],
-                    "result": result
+            assistant_msg = {
+                "role": "assistant",
+                "content": current_response.content or None,
+                "tool_calls": [
+                    {
+                        "id": tc.get("id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": json.dumps(
+                                tc["arguments"], ensure_ascii=False
+                            ),
+                        },
+                    }
+                    for tc in current_response.tool_calls
+                ],
+            }
+
+            round_results: List[Dict[str, Any]] = []
+            for tc in current_response.tool_calls:
+                result = await tool_executor.execute(tc["name"], tc["arguments"])
+                round_results.append({
+                    "tool": tc["name"],
+                    "id": tc.get("id", ""),
+                    "arguments": tc["arguments"],
+                    "result": result,
+                    "content": json.dumps(result, ensure_ascii=False, default=str),
                 })
+            tool_results.extend(round_results)
 
-            # 将工具结果追加到消息历史
-            self.prompt_builder.add_tool_results(tool_results)
+            self.prompt_builder.add_tool_exchange(assistant_msg, round_results)
 
-            # 可选：ReflAct式反思
-            if self.config.use_reflection and tool_results:
-                reflection_response = await self._reflect_on_tools(tool_results)
-                if reflection_response:
-                    self.prompt_builder.add_reflection(reflection_response)
+            if self.config.use_reflection and round_results:
+                reflection = await self._reflect_on_tools(round_results)
+                if reflection:
+                    self.prompt_builder.add_assistant_note(reflection)
 
-            # 继续生成
             current_response = await self._continue_chat()
 
-        # 最终决策
         if current_response.content:
             move = self._extract_move(
                 current_response.content,
-                legal_moves=legal_moves
+                legal_moves=game_state.get('legal_moves', [])
             )
             return AgentResult(
                 success=True,
@@ -177,10 +183,14 @@ class BaseAgent(ABC):
         return AgentResult(success=False, error="Failed to get final move")
 
     async def _continue_chat(self) -> LLMResponse:
-        """继续聊天（工具调用后）"""
+        """继续生成，不追加新的 user 消息。
+
+        上一轮的工具结果本身就是上下文的一部分；再加一条 user 会造成
+        连续 user 消息（R-3）。
+        """
         messages = self.prompt_builder.build_messages(
             self.config.system_prompt,
-            "基于工具调用结果，请继续你的决策。"
+            user_content=None,
         )
 
         return await self.config.llm_adapter.chat(
@@ -188,7 +198,7 @@ class BaseAgent(ABC):
             tools=self.prompt_builder.get_tools() if self.config.use_tools else None
         )
 
-    async def _reflect_on_tools(self, tool_results: List[Dict]) -> Optional[str]:
+    async def _reflect_on_tools(self, tool_results: List[Dict[str, Any]]) -> Optional[str]:
         """对工具调用结果进行反思（ReflAct风格）
 
         反思问题：
@@ -214,6 +224,7 @@ class BaseAgent(ABC):
             return reflection_response.content if reflection_response.content else None
         except Exception:
             return None
+
 
     def _format_tool_results(self, tool_results: List[ToolResultDict]) -> str:
         """格式化工具结果用于反思prompt"""
@@ -280,27 +291,26 @@ class BaseAgent(ABC):
         self.prompt_builder.clear_history()
         self.last_response = None
 
-    def add_correction_feedback(self, error_msg: str, legal_moves: Optional[List[str]] = None) -> None:
-        """添加纠正性反馈到prompt历史，强制LLM修正错误
+    def add_correction_feedback(
+        self,
+        error_msg: str,
+        legal_moves: Optional[List[str]] = None
+    ) -> None:
+        """登记纠错反馈，并入下一条 user 消息。
 
-        Args:
-            error_msg: 错误信息
-            legal_moves: 可选的合法走步列表
+        不能直接 append 一条 user 消息 —— 连续 user 消息在 Anthropic
+        Messages API 下非法（R-3）。改为挂起，由 PromptBuilder 在构造
+        本轮 user 内容时合并进去。
         """
-        correction_prompt = f"""【系统纠错】你的上一次输出存在问题：
-
-错误类型：{error_msg}
-
-请严格按照以下格式重新输出JSON（不要输出任何其他内容）：
-{{
-  "thought": "你的思考过程",
-  "move": "从legal_moves中选择的4字符ICCS走步"
-}}
-"""
+        parts = ["【系统纠错】你的上一次输出存在问题：", "", "错误类型：%s" % error_msg]
         if legal_moves:
-            correction_prompt += f"\n当前合法走步列表：{legal_moves[:20]}{'...' if len(legal_moves) > 20 else ''}"
-
-        correction_prompt += '\n\n如果局面确实无法挽救，你可以输出 {"thought": "认输原因", "move": "jxjx"} 来认输。'
-
-        # 添加到历史，LLM下次思考时会看到
-        self.prompt_builder.add_to_history("user", correction_prompt)
+            parts.append("当前合法走步列表：%s%s" % (
+                legal_moves[:20], "..." if len(legal_moves) > 20 else ""))
+        parts.append(
+            "\n请严格按照以下格式重新输出JSON（不要输出任何其他内容）：\n"
+            '{"thought": "你的思考过程", "move": "从legal_moves中选择的4字符ICCS走步"}'
+        )
+        parts.append(
+            '\n如果局面确实无法挽救，你可以输出 {"thought": "认输原因", "move": "jxjx"} 来认输。'
+        )
+        self.prompt_builder.correction = "\n\n".join(parts)

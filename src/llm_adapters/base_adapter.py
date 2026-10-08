@@ -18,6 +18,8 @@ class MessageDict(TypedDict):
 
 class ToolCallDict(TypedDict):
     """工具调用字典类型"""
+    # R-2: without id the tool result cannot be tied back to its call
+    id: str
     name: str
     arguments: Dict[str, Any]
 
@@ -40,6 +42,7 @@ class ToolCall:
     """工具调用结构"""
     name: str
     arguments: Dict[str, Any]
+    id: str = ""
 
 
 class BaseLLMAdapter(ABC):

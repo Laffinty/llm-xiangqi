@@ -274,6 +274,11 @@ class LLMAgentGameController(GameController):
         if self.current_agent is None:
             return MoveResult(success=False, error="No agent for current turn")
 
+        # reset per turn: history otherwise grows without bound across turns,
+        # and consecutive user messages are invalid under the Anthropic
+        # Messages API (R-3).
+        self.current_agent.reset()
+
         legal_moves = self.referee.get_legal_moves()
         last_error_msg = None
 
