@@ -951,28 +951,54 @@ class ToolExecutor:  # 单例
 
 ---
 
-### 7.6 决策契约（`设计态`）
+### 7.6 决策契约（`设计态`，**v0.4.0 实测后修正**）
 
-模型对「走哪一步」的响应遵循固定 schema，**合法走步以 `enum` 写入**，使模型物理上无法输出非法走步：
+模型对「走哪一步」的响应遵循固定 schema，**合法走步以 `enum` 写入**，使模型物理上无法输出非法走步。
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "move":       {"type": "string", "enum": ["<合法走步1>", "...", "共 N 项"]},
-    "thought":    {"type": "string"},
-    "confidence": {"type": "number"},
-    "skill_used": {"type": "string"}
-  },
-  "required": ["move", "thought", "confidence", "skill_used"],
-  "additionalProperties": false
-}
+**实现式：单个工具调用，`strict` 放在函数定义内。**
+
+```python
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "move_decision",
+        "strict": True,
+        "description": "输出走步决策",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "move":       {"type": "string", "enum": ["<合法走步1>", "...", "共 N 项"]},
+                "thought":    {"type": "string"},
+                "confidence": {"type": "number"}
+            },
+            "required": ["move", "thought", "confidence"],
+            "additionalProperties": False
+        }
+    }
+}]
+tool_choice = "auto"
 ```
 
-启用 strict 模式时，schema 必须满足三条硬性要求，否则请求被供应商拒绝：
-每个 object 必须声明 `additionalProperties: false`；`properties` 中每个字段都必须列入 `required`；可选字段用类型联合表达（如 `["string", "null"]`）。
+**三条已实测的供应商约束（实现时不得违反）：**
 
-**降级路径为强制项**：DeepSeek / MiMo / MiniMax 对 strict 的支持不一致。供应商不支持时，回退到非 strict function calling + 本地 schema 校验 + 单次纠错，且**降级路径必须单独评测**（否则「strict 生效」这个假设永远无法证伪）。
+| # | 约束 | 来源 |
+|---|---|---|
+| C-1 | `strict` 必须放在函数定义内，不能放 `response_format: json_schema` | DeepSeek 返回 400 `This response_format type is unavailable now` |
+| C-2 | 不得使用 `tool_choice: "required"` | DeepSeek 返回 400 `Thinking mode does not support this tool_choice` |
+| C-3 | 多轮工具调用时必须回送 `reasoning_content` | 两家均为 thinking model，缺字段会报错 |
+
+**能力矩阵（2026-10-08 实测）：**
+
+| provider | model | 函数内 strict | `response_format: json_schema` | `tool_choice: required` |
+|---|---|---|---|---|
+| DeepSeek | `deepseek-flash` | ✓ | ✗ 400 | ✗ 400 |
+| MiMo | `mimo-v2.6-flash` | ✓ | ✓ | 未测 |
+
+非 strict 时 DeepSeek 实测吐出过语法错误的 JSON arguments，说明 `strict` 真实收紧了输出。
+
+**降级路径为强制项**：未来新增的 provider 若不支持函数内 `strict`，
+回退到非 strict + 本地 schema 校验 + 单次纠错，且**降级路径必须单独评测**。
+证据与完整探测记录见 `docs/skill-mode-design.md` §F-011 ~ §F-016。
 
 ---
 

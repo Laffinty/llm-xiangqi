@@ -12,14 +12,16 @@ class MiMoAdapter(OpenAICompatibleAdapter):
 
     API格式:
     - Base URL: https://api.xiaomimimo.com/v1
-    - 模型: mimo-v2-pro, mimo-v2-omni, mimo-v2-flash
+    - 模型: mimo-v2.6-pro, mimo-v2.6-flash, mimo-v2.6-pro-ultraspeed
     - 协议: OpenAI兼容
+
+    注: mimo-v2.5-pro / mimo-v2.5 将于 2026-10-21 下线；v2-pro / v2-omni / v2-flash 已不存在。
     """
 
     def __init__(
         self,
         api_key: str,
-        model: str = "mimo-v2-pro",
+        model: str = "mimo-v2.6-flash",
         base_url: str = "https://api.xiaomimimo.com/v1",
         timeout: int = 60,
         max_retries: int = 3,

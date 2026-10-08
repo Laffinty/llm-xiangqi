@@ -180,6 +180,60 @@ all_matches = re.findall(r'\b([a-iA-I][0-9][a-iA-I][0-9])\b', content)
 
 **未实测**：需要一个 MiniMax 适配器的真实调用来确认报错文本。理由见 `RK-04`。
 
+### F-011 两家都接受 `Authorization: Bearer` —— `已核实`
+
+官方文档中 MiMo 所有示例均用 `api-key: $MIMO_API_KEY` 头，而仓库 `OpenAICompatibleAdapter`
+经 `AsyncOpenAI(api_key=...)` 发出的是 `Authorization: Bearer`。
+用仓库自身的 `DeepSeekAdapter` / `MiMoAdapter` 真实请求验证：**两者均返回 200 且正常与模型对话**，
+Bearer 可用，无需为 MiMo 保留单独认证路径。
+
+证伪命令：删除 `openai_base_adapter.py:47` 的 `AsyncOpenAI(...)` 构造后重跑探测脚本，若 MiMo 返回 401/403 则本条作废。
+
+### F-012 DeepSeek 不支持 `response_format: json_schema` —— `已核实`
+
+```
+response_format = {"type": "json_schema", "json_schema": {"strict": True, ...}}
+-> 400 {"message": "This response_format type is unavailable now"}
+```
+
+官方文档标注 Json Output 为「✓」，但**不包含 `json_schema` 子类型**。
+**因此 v0.4.0 api-standard §7.6 初稿里写的 `response_format` 方案对 DeepSeek 不成立，已改为函数定义内 `strict` 方案。**
+
+### F-013 DeepSeek 不支持 `tool_choice: "required"` —— `已核实`
+
+```
+tool_choice = "required"  -> 400 {"message": "Thinking mode does not support this tool_choice"}
+```
+
+`tool_choice: "auto"` 与不传 `tool_choice` 均正常。
+**代表：不能用 `required` 来强制模型必须调函数。**
+
+### F-014 `strict: true` 放在函数定义内 —— 两家均可用，且**它真的在起作用** —— `已核实`
+
+对 4 组配置（两家 × strict 开关）做矩阵探测：
+
+| provider | strict | tool_choice | 结果 |
+|---|---|---|---|
+| DeepSeek | `true` | `auto` | OK，`move` 落在 enum 内 |
+| DeepSeek | `true` | 不传 | OK，`move` 落在 enum 内 |
+| DeepSeek | `false` | 不传 | **失败**：模型输出了 JSON 语法错误的 `arguments`（`Expecting ',' delimiter`） |
+| MiMo | `true` | 不传 | OK，`move` 落在 enum 内 |
+| MiMo | `false` | `auto` | OK |
+
+**关键证据**：DeepSeek 在 `strict=false` 时实测吐出了语法错误的 JSON。
+这说明 `strict` 不是装饰性标记，而是真实收紧了输出。
+
+### F-015 `tool_calls[].id` 实测存在 —— `已核实`
+
+两家返回的 tool_call 都带非空 `id`（探测输出 `id_present=True`）。
+**这使 api-standard §3.4 的 R-1/R-2 可实现：信息确实存在，只是仓库没用。**
+
+### F-016 MiMo 在 `strict=true` + `tool_choice=auto` 下单次未触发工具调用 —— `待验证`
+
+矩阵中唯一一次未触发的组合。同一 schema 在其余 7 组均正常。
+判断为采样抖动而非约束，但尚未统计率，因此保留为待验证。
+
+
 ---
 
 ## §2 裁决
@@ -224,11 +278,42 @@ Anthropic 官方区分 **workflow**（预定义代码路径）与 **agent**（�
 
 ### D-05 决策契约消灭正则与重试
 
-把合法走法作为 `enum` 写入响应 schema，使模型**物理上无法输出非法走法**，`game_controller.py:280` 的 3 次重试循环随之消失。
+把合法走步作为 `enum` 写入 schema，使模型**物理上无法输出非法走步**，
+`game_controller.py:280` 的 3 次重试循环随之消失。
 
-**否决方案**：改进正则 / 加重试次数。否决理由：已在用正则兜底且失败率高（F-008），说明这是结构问题不是模式问题。
+**实测确认的可移植实现（v0.4.0 修正）：**
+用**单个工具调用**，而不是 `response_format`。
 
-**约束**：DeepSeek / MiMo / MiniMax 对 strict schema 支持不一致，**必须有降级路径，且降级路径本身要测**。不能假设供应商行为。
+```python
+tools = [{"type": "function", "function": {
+    "name": "move_decision",
+    "strict": True,                      # 关键：放在函数定义内
+    "description": "输出走步决策",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "move":       {"type": "string", "enum": ["<N 项合法走步>"]},
+            "thought":    {"type": "string"},
+            "confidence": {"type": "number"}
+        },
+        "required": ["move", "thought", "confidence"],
+        "additionalProperties": False
+    }
+}}]
+tool_choice = "auto"     # 绝不用 "required"（F-013）
+```
+
+该路径在 **DeepSeek 与 MiMo 两家均实测通过**（F-014），且非 strict 时 DeepSeek 实测会吐出非法 JSON——
+strict 在这里是有实质作用的，不是装饰。
+
+**三条已核实的约束（写入实现时必须遵守）：**
+1. `strict` 放函数定义内，不放 `response_format`（DeepSeek 拒绝，F-012）
+2. 不得用 `tool_choice: "required"`（DeepSeek 拒绝，F-013）
+3. 两家都是 thinking model，**多轮工具调用时必须回送 `reasoning_content`**，否则会报错
+
+**降级路径仍为强制项**：若未来添加的 provider 不支持函数内 `strict`，
+回退到非 strict + 本地 schema 校验 + 单次纠错。
+**降级路径必须单独评测**（否则「strict 生效」这个假设永远无法证伪）。
 
 ### D-06 不引入真实 MCP server
 
@@ -467,7 +552,13 @@ python -m pytest tests/test_agents.py -q
 python -m tests.eval.run --compare docs/eval-baseline.json
 ```
 
-**反向守卫**：非法走步率必须**不高于**基线；若供应商不支持 strict，必须走降级路径且降级路径有独立测试覆盖（`D-05` 约束）。
+**反向守卫**：非法走步率必须**不高于**基线。
+降级路径必须有独立测试覆盖（`D-05` 约束）。
+
+**已实测需额外防御的三个地雷**（均已实测，实现时不得违反）：
+- 禁止将 `strict` 放入 `response_format`（DeepSeek 400）
+- 禁止使用 `tool_choice: "required"`（DeepSeek 400）
+- 多轮工具调用必须回送 `reasoning_content`（两家都是 thinking model）
 
 ---
 
@@ -528,7 +619,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | ID | 风险 | 状态 | 触发后果 |
 |---|---|---|---|
 | `RK-01` | LLM 在棋盘空间推理上强依赖 ASCII 渲染，纯结构化反而更弱 | `开放` | 由 W-04 A/B 消解；已用 `D-04` 保留 ASCII 兜底 |
-| `RK-02` | 供应商 strict schema 行为不一致，strict 名义生效实则降级 | `开放` | 由 W-03 的降级路径测试消解 |
+| `RK-02` | 供应商 strict 行为不一致 | **已部分消解** | 实测：函数内 strict 两家均可用（F-014）；但 `response_format` 与 `tool_choice:required` 被拒（F-012/F-013），已改写 D-05 |
 | `RK-03` | 评测本身引入方差，N 局不足以区分 A/B | `开放` | W-02 的反向守卫（逐字节可复现）+ 加大 N |
 | `RK-04` | F-010 未实测，Anthropic 协议下的具体报错未知 | `开放` | W-01 完成后立即实测 |
 | `RK-05` | Skill 拆分把 doctrine 切碎后，模型跨 skill 推理出现断层 | `开放` | 由 W-05 的 A/B 消解 |
