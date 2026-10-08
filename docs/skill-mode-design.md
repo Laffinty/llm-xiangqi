@@ -234,6 +234,28 @@ tool_choice = "required"  -> 400 {"message": "Thinking mode does not support thi
 判断为采样抖动而非约束，但尚未统计率，因此保留为待验证。
 
 
+### F-017 当前配置下模型「从不给出答案」，走步全靠从思考过程里正则刨 —— `已核实`
+
+`W-02` 评测 harness 实跑（`endgame_m14_p059`，2026-10-08）时暴露：
+
+| | finish_reason | content 长度 | thought 长度 | content 内走步 | thought 内走步 |
+|---|---|---|---|---|---|
+| DeepSeek `deepseek-flash` | `length` | **0** | 6473 | **0** | 28 |
+| MiMo `mimo-v2.6-flash` | `length` | **0** | 6746 | **0** | 36 |
+
+`config/agentX_config.yaml` 的 `max_tokens: 2048` 被思维链**完整吃光**（`completion_tokens` 恰好等于
+`max_tokens`，`finish_reason` 为 `length`），模型从未写到它被要求的 JSON 答案。
+
+`LLMAgent` 的 `content` 为空时回退到 `response.thought`（`llm_agent.py:48`），于是走步是从
+**被截断的推理文本**里正则刨出来的。整局 12 手，`text_only_ratio = 1.0`，出现 9 次
+`_extract_move` 解析失败。
+
+**这不是 Skill 模式的问题，是独立的 P0 级缺陷**：两家都是 thinking model，而配置按非推理模型设定。
+
+证伪命令：把 `max_tokens` 调到 16384 后重跑上表，若 `content` 恢复非空、`finish_reason` 不再是
+`length`，则本条成立。
+
+
 ---
 
 ## §2 裁决
@@ -504,13 +526,45 @@ python -m tests.eval.run --games 20 --seed 42 --out baseline.json
 python -m tests.eval.run --verify baseline.json
 ```
 
-**反向守卫**：
-- 同一 commit 跑两次，报告必须**逐字节一致**（确定性）
-- 基线一旦变化而无法归因 → 判定基线污染，停工
+**反向守卫**（已按实测修正——原「两次 live 跑逐字节一致」做不到）：
+LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的约束，
+写了也只会诱导后来人放宽到「差不多就行」。改为**三条可证明的确定性**：
+
+1. **序列化确定性**：报告文件内容 == 规范化重新序列化的输出
+2. **汇总纯函数性**：仅用 `raw` 重算 summary，整份报告与文件逐字节相同
+3. **局面集完整性**：全部 FEN 用 `RefereeEngine` 复验通过
+
+这三条由 `python -m tests.eval.run --verify <报告>` 一次跑完。
 
 **产出**：`docs/eval-baseline.json`（提交进仓库，作为所有后续阶段的比较基准）
 
 ---
+
+### W-00 thinking token 预算 —— `待做` ★**先于 W-02 基线采集**
+
+**依赖**：无
+**非目标**：不改 prompt 文本，不改决策契约，不引入 skill。**只调 token 预算。**
+
+**为什么排在最前**：`F-017` 证明当前 `max_tokens: 2048` 让模型永远写不出答案，
+走步全靠从截断的思考里刨。在这个状态下采集的基线，测的是**一个坏掉的系统**；
+而它作为「before」仍然有价值——只是必须**明确知道** before 坏在哪。
+先修预算再采基线，后续 `W-03` 的收益才不会被这个噪声淹没。
+
+**改动面**：`config/agent1_config.yaml`、`config/agent2_config.yaml` 的 `max_tokens`
+（必要时同步 `src/llm_adapters/*_base_adapter.py` 的默认值 2048）
+
+**验收命令**：
+```
+rg -n "max_tokens" config/ src/llm_adapters/
+```
+复跑 `F-017` 的诊断脚本，要求 `finish_reason != length` 且 `content` 非空。
+
+**反向守卫**：`text_only_ratio` 必须下降；`completion_tokens == max_tokens` 的次数必须归零。
+
+**注意**：加深预算会拉长每手耗时（F-017 实测约 29 秒/手），采集基线前需重估总时长。
+
+---
+
 
 ### W-01 协议修复 —— `待做`
 
@@ -631,6 +685,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 
 | 工作项 | 状态 | 门禁结果 | 日期 |
 |---|---|---|---|
+| `W-00` thinking token 预算 | `待做` | — | — |
 | `W-02` 评测基线 | `待做` | — | — |
 | `W-01` 协议修复 | `待做` | — | — |
 | `W-03` 决策契约 | `待做` | — | — |
@@ -638,7 +693,10 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | `W-05` 知识 skill | `待做` | — | — |
 | `W-06` 动作 skill | `待做` | — | — |
 
-**执行顺序**：`W-02` 与 `W-01` 可并行；此后严格串行 `W-03 → W-04 → W-05 → W-06`。
+**执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → `W-03` → `W-04` → `W-05` → `W-06`。
+
+`W-00` 是后补的：它是在 `W-02` 的实跑中才暴露的（F-017）。harness 建好后第一件事
+就是发现了它——这本身就是「先建度量」这条裁决（D-08）的收益证明。
 
 ---
 

@@ -1,0 +1,54 @@
+{
+  "_note": "由引擎实走生成，禁止手改；每个 FEN 都经 RefereeEngine 复验",
+  "cases": [
+    {
+      "id": "opening_p05",
+      "category": "opening",
+      "fen": "rnbakabnr/9/1c7/pCp3p1p/4p4/7c1/P1P1P1P1P/C8/9/RNBAKABNR w - - 0 1",
+      "legal_moves": 34,
+      "note": "引擎实走 5 手后截取"
+    },
+    {
+      "id": "opening_p13",
+      "category": "opening",
+      "fen": "r1bakab1r/9/2n3n1c/1Cp3p1p/p3p4/7c1/PCP1P1P1P/4B4/9/RN1AKABNR w - - 0 1",
+      "legal_moves": 32,
+      "note": "引擎实走 13 手后截取"
+    },
+    {
+      "id": "middlegame_p25",
+      "category": "middlegame",
+      "fen": "rn1akab1r/9/8c/C1p5p/p1b1p1pn1/1C7/P1P1P1P1P/4B2c1/4A3R/RN2KABN1 w - - 0 1",
+      "legal_moves": 44,
+      "note": "引擎实走 25 手后截取"
+    },
+    {
+      "id": "middlegame_p41",
+      "category": "middlegame",
+      "fen": "1n2kabr1/4a4/4bc3/rCp2R3/4p1pnp/p5B2/2P1P1P1P/1Cc6/4A4/R3KABN1 w - - 0 1",
+      "legal_moves": 44,
+      "note": "引擎实走 41 手后截取"
+    },
+    {
+      "id": "in_check_p111",
+      "category": "in_check",
+      "fen": "4kab2/3n5/3a1C3/1C7/2p1p1bn1/r1PRP1P2/4c4/4BAp1r/9/4KA3 w - - 0 1",
+      "legal_moves": 5,
+      "note": "红方被将军，5 个合法应手"
+    },
+    {
+      "id": "endgame_m14_p059",
+      "category": "endgame",
+      "fen": "2b1ka3/9/b4a3/6p2/4P4/2p3P1p/9/5K2B/4A4/2B6 w - - 0 1",
+      "legal_moves": 12,
+      "note": "残局，剩 14 子，12 个合法走法"
+    },
+    {
+      "id": "endgame_m9_p085",
+      "category": "endgame",
+      "fen": "2b1k4/4a4/b4P3/9/9/9/9/B2K4p/9/5A3 w - - 0 1",
+      "legal_moves": 8,
+      "note": "残局，剩 9 子，8 个合法走法"
+    }
+  ]
+}
