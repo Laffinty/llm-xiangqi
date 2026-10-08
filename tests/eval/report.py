@@ -1,11 +1,12 @@
-"""报告聚合与确定性序列化。
-
-硬性要求：**summary 必须是 raw 的纯函数**。
-`--verify` 会用同一份 raw 重算 summary 并逐字节比对，
-因此聚合层的确定性是可证明的，而不是口头保证。
-"""
+# -*- coding: utf-8 -*-
+"""Report layer: distinguish real draws from turn-cap truncations, and let the
+report state its own limits instead of leaving them for the reader to infer."""
+from pathlib import Path
 import json
 from typing import Dict, List
+
+# game_controller.GameEndReasons
+CAP_REASONS = ("Maximum turns reached", "Stalemate", "�϶�Ŀ���")
 
 
 def _round(x, nd=2):
@@ -17,30 +18,34 @@ def _mean(vals: List[float]):
     return _round(sum(vals) / len(vals)) if vals else None
 
 
+def classify(record: Dict) -> str:
+    """把一局归类。cap = 被回合上限截断，不是真结果。"""
+    res = record.get("result")
+    reason = record.get("result_reason") or ""
+    if record.get("aborted"):
+        return "aborted"
+    if res == "red_win":
+        return "red_win"
+    if res == "black_win":
+        return "black_win"
+    if res == "draw":
+        if any(cap in reason for cap in CAP_REASONS):
+            return "draw_by_cap"
+        return "draw_natural"
+    return "unknown"
+
+
 def summarize(records: List[Dict]) -> Dict:
     """从原始记录计算汇总。纯函数：同样的 raw 必得同样的 summary。"""
-    played = [r for r in records if not r.get("aborted")]
-    aborted = [r for r in records if r.get("aborted")]
-
-    red_view = {"red_win": 0, "draw": 0, "black_win": 0, "unknown": 0}
-    for r in played:
-        res = r.get("result")
-        if res == "red_win":
-            red_view["red_win"] += 1
-        elif res == "draw":
-            red_view["draw"] += 1
-        elif res == "black_win":
-            red_view["black_win"] += 1
-        else:
-            red_view["unknown"] += 1
+    kinds = [classify(r) for r in records]
+    counts = {k: kinds.count(k) for k in
+              ("red_win", "black_win", "draw_natural", "draw_by_cap", "aborted", "unknown")}
 
     def side_totals(side: str) -> Dict:
         calls = sum(r["stats"][side]["llm_calls"] for r in records)
-        tool = sum(r["stats"][side]["tool_call_turns"] for r in records)
         content = sum(r["stats"][side]["content_only_turns"] for r in records)
         return {
             "llm_calls": calls,
-            "tool_call_turns": tool,
             "content_only_turns": content,
             # 纯文本回合占比 = 正则兜底路径占比 = 非法走步的先行指标
             "text_only_ratio": _round(content / calls) if calls else None,
@@ -51,20 +56,22 @@ def summarize(records: List[Dict]) -> Dict:
 
     by_category: Dict[str, Dict] = {}
     for cat in sorted({r["category"] for r in records}):
-        sub = [r for r in records if r["category"] == cat]
+        sub = [r for r, k in zip(records, kinds) if r["category"] == cat]
+        sub_k = [k for r, k in zip(records, kinds) if r["category"] == cat]
         by_category[cat] = {
             "games": len(sub),
-            "aborted": len([r for r in sub if r.get("aborted")]),
+            "red_win": sub_k.count("red_win"),
+            "black_win": sub_k.count("black_win"),
+            "draw_natural": sub_k.count("draw_natural"),
+            "draw_by_cap": sub_k.count("draw_by_cap"),
+            "aborted": sub_k.count("aborted"),
             "mean_ply": _mean([r["turn_count"] for r in sub]),
-            "red_win": len([r for r in sub if r.get("result") == "red_win"]),
-            "draw": len([r for r in sub if r.get("result") == "draw"]),
-            "black_win": len([r for r in sub if r.get("result") == "black_win"]),
         }
 
-    return {
+    summary = {
         "games": len(records),
-        "aborted": len(aborted),
-        "red_view": red_view,
+        "outcome": counts,
+        "decisive_games": counts["red_win"] + counts["black_win"],
         "mean_ply": _mean([r["turn_count"] for r in records]),
         "mean_elapsed_sec": _mean([r["elapsed_sec"] for r in records]),
         "mean_tokens_per_turn": _round(
@@ -72,17 +79,42 @@ def summarize(records: List[Dict]) -> Dict:
              / max(1, sum(r["turn_count"] for r in records))), 1),
         "sides": {"Red": side_totals("Red"), "Black": side_totals("Black")},
         "by_category": by_category,
+        "result_reasons": sorted({r.get("result_reason") or "" for r in records}),
     }
+    summary["warnings"] = _warnings(summary)
+    return summary
+
+
+def _warnings(s: Dict) -> List[str]:
+    """报告必须自己说清它测不出什么，而不是让读的人脑补。"""
+    w = []
+    if s["games"] and s["decisive_games"] == 0:
+        w.append("本批无胜负局：胜负指标不可观测，不能据此比较棋力。"
+                 "可用指标为 token 成本 / 耗时 / 走步合法率 / text_only_ratio。")
+    if s["outcome"]["draw_by_cap"]:
+        w.append("%d 局被回合上限截断，属未完成对局，不计入和棋判断。"
+                 % s["outcome"]["draw_by_cap"])
+    if s["sides"]["Red"]["text_only_ratio"] == 1.0 and s["sides"]["Black"]["text_only_ratio"] == 1.0:
+        w.append("双方 text_only_ratio 均为 1.0：从未发生工具调用，"
+                 "全部走步经由正则从自由文本提取（use_tools=false）。")
+    return w
 
 
 def build(records: List[Dict], meta: Dict) -> Dict:
-    """组装完整报告。meta 记录测的是什么——基线必须自述。"""
-    return {
-        "schema": "llm-xiangqi/eval-report@1",
-        "meta": meta,
-        "summary": summarize(records),
-        "raw": records,
-    }
+    """组装完整报告。meta 记录测的是什么——基线必须自述。
+
+    caveats 按插入顺序追加并去重（保序，不排序）——
+    排序会让 --restate 与 --verify 走出不同结果，那正是确定性守卫要抓的。
+    """
+    meta = dict(meta)
+    caveats = list(meta.get("caveats", []))
+    summary = summarize(records)
+    for w in summary["warnings"]:
+        if w not in caveats:
+            caveats.append(w)
+    meta["caveats"] = caveats
+    return {"schema": "llm-xiangqi/eval-report@2", "meta": meta,
+            "summary": summary, "raw": records}
 
 
 def dumps(report: Dict) -> str:

@@ -46,13 +46,16 @@ def cmd_verify(path: str) -> int:
     ok_serialize = (canonical == data)
     ok_summary = (recomputed == data)
 
+    s = loaded["summary"]
     print("报告 schema :", loaded.get("schema"))
-    print("  游戏数     :", loaded["summary"]["games"], " 中止:", loaded["summary"]["aborted"])
-    print("  红方视角   :", loaded["summary"]["red_view"])
-    print("  平均 ply   :", loaded["summary"]["mean_ply"])
+    print("  游戏数     :", s["games"], " 分出胜负:", s["decisive_games"])
+    print("  结果分布   :", s["outcome"])
+    print("  平均 ply   :", s["mean_ply"])
     print("  纯文本占比 : Red=%s Black=%s" % (
-        loaded["summary"]["sides"]["Red"]["text_only_ratio"],
-        loaded["summary"]["sides"]["Black"]["text_only_ratio"]))
+        s["sides"]["Red"]["text_only_ratio"],
+        s["sides"]["Black"]["text_only_ratio"]))
+    for w in s.get("warnings", []):
+        print("  ! " + w)
     print()
     print("[%s] 序列化确定性（文件内容 == 规范化输出）" % ("OK" if ok_serialize else "FAIL"))
     print("[%s] 汇总纯函数性（raw 重算 == 文件内容）" % ("OK" if ok_summary else "FAIL"))
@@ -73,6 +76,24 @@ def cmd_probe(api_file: str) -> int:
     results = asyncio.run(providers.probe(keys))
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return 0 if all(r.get("chat_ok") for r in results) else 1
+
+
+def cmd_restate(path: str, notes) -> int:
+    """从既有 raw 重算报告。不联网、不重跑对局。"""
+    src = json.loads(Path(path).read_text(encoding="utf-8"))
+    meta = dict(src["meta"])
+    # 只记首次重算时的来源 schema。否则第二次 restate 会把它覆盖成当前
+    # schema，文件随之改变——restate 就不是幂等的了。
+    meta.setdefault("restated_from_schema", src.get("schema", "unknown"))
+    if notes:
+        meta["notes"] = list(meta.get("notes", [])) + list(notes)
+    doc = report.build(src["raw"], meta)
+    Path(path).write_text(report.dumps(doc), encoding="utf-8")
+    print("已按新格式重算 %s" % path)
+    print(json.dumps(doc["summary"]["outcome"], ensure_ascii=False, indent=2))
+    for w in doc["summary"]["warnings"]:
+        print("  ! " + w)
+    return 0
 
 
 async def cmd_run(args) -> int:
@@ -135,6 +156,11 @@ def main(argv=None) -> int:
                     help="覆盖 thinking 开关（默认沿用 config）。用于 A/B："
                          "--thinking true / --thinking false")
     ap.add_argument("--verify", metavar="PATH", default=None)
+    ap.add_argument("--restate", metavar="PATH", default=None,
+                    help="用既有 raw 重算报告（不联网、不重跑对局）。"
+                         "报告格式演进后用它替代重跑。")
+    ap.add_argument("--restate-note", action="append", default=None,
+                    help="追加到 meta.notes 的说明，可多次")
     ap.add_argument("--cases-only", action="store_true")
     ap.add_argument("--probe", action="store_true")
     args = ap.parse_args(argv)
@@ -148,6 +174,8 @@ def main(argv=None) -> int:
             return 0
         if args.verify:
             return cmd_verify(args.verify)
+        if args.restate:
+            return cmd_restate(args.restate, args.restate_note)
         if args.probe:
             return cmd_probe(args.api_file)
         return asyncio.run(cmd_run(args))
