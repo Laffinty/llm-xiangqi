@@ -286,6 +286,53 @@ prompt 本身要求模型在 `thought` 字段里做四步分析，那部分推�
 若 content 仍非空且耗时相近，则本条结论二作废。
 
 
+### F-019 thinking 开关 A/B：ON 在当前 token 预算下几乎完全不可用 —— `已核实`
+
+3 个代表性局面 × 2 家 × {ON, OFF}，每格 1 次真实调用（2026-10-08，走生产路径
+`game.py::_create_adapter` + 真实 config + 真实对局 prompt）。
+
+| 局面 | provider | thinking | finish | 秒 | content | 合法走步 |
+|---|---|---|---|---|---|---|
+| `endgame_m14_p059` | DeepSeek | OFF | `stop` | **2.3** | 202 | 2 |
+| `endgame_m14_p059` | DeepSeek | ON | `length` | 9.8 | **0** | 0 |
+| `endgame_m14_p059` | MiMo | OFF | `stop` | **3.7** | 197 | 1 |
+| `endgame_m14_p059` | MiMo | ON | `stop` | 18.7 | 256 | 1 |
+| `opening_p13` | DeepSeek | OFF | `stop` | **2.8** | 420 | **0** |
+| `opening_p13` | DeepSeek | ON | `length` | 9.5 | **0** | 0 |
+| `opening_p13` | MiMo | OFF | `stop` | **8.5** | 266 | 1 |
+| `opening_p13` | MiMo | ON | `length` | 37.2 | **0** | 0 |
+| `in_check_p111` | DeepSeek | OFF | `stop` | **2.4** | 334 | 1 |
+| `in_check_p111` | DeepSeek | ON | `length` | 9.7 | **0** | 0 |
+| `in_check_p111` | MiMo | OFF | `stop` | 11.8 | 301 | 1 |
+| `in_check_p111` | MiMo | ON | `length` | 45.4 | **0** | 0 |
+
+**可用率：OFF 5/6，ON 1/6。** 耗时 OFF 2.3–11.8s，ON 9.5–45.4s。
+
+DeepSeek 在 ON 档 3/3 全部 `finish_reason=length`、`content` 为空；MiMo 2/3 如此。
+这说明 F-017 不是偶发，而是**在 `max_tokens: 2048` 下 thinking 开启的必然结果**。
+
+**样本量诚实说明**：每格仅 1 次调用。这里敢下结论，依据是效应量足够大
+（可用率 5:1），而不是样本量——但「棋力是否受损」这个问题 1 次调用完全回答不了。
+
+---
+
+### F-020 即便 thinking 关闭，仍有模型写出「无法解析的答案」 —— `已核实`
+
+`opening_p13` + DeepSeek + thinking=OFF：content 420 字符、`finish_reason=stop`，
+**但 content 里一个 ICCS 走步都没有**。模型给出了完整回答，却不是正则能抓的格式
+（推测为中文记谱如「炮二平五」，未逐条核对原文，**这是推测不是结论**）。
+
+后果：`LLMAgent._extract_move` 返回 None → 注入纠错 → 重试。基线日志里也确实出现了
+多次 `LLM返回None (解析失败)`。
+
+**这条是 W-03 决策契约的直接依据**：把合法走法写成 schema 的 `enum` 之后，
+「答案格式不对」这一类失败**在构造上就不存在**——它与 prompt 措辞、记谱习惯、
+模型心情都无关。
+
+证伪命令：取 `opening_p13` + DeepSeek + thinking=OFF 重跑，若 content 中稳定出现 ICCS
+模式，则本条的普遍性作废（但该次失败本身仍然成立）。
+
+
 ---
 
 ## §2 裁决
@@ -599,7 +646,9 @@ LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的�
 
 **反向守卫**：`text_only_ratio` 必须下降；`completion_tokens == max_tokens` 的次数必须归零。
 
-**遗留**：棋力是否因此下降，属**待测项**（见 F-018「未回答的问题」），不得当作已知结论。
+**机制层 A/B 已补（F-019）**：thinking=ON 可用率 1/6，OFF 为 5/6，且 OFF 快 4–20 倍。W-00 在机制层面成立。
+
+**仍遗留**：棋力是否因此下降，属**待测项**。F-019 每格仅 1 次调用，回答不了这个问题；需每组 30+ 局且能自然终局，按实测约 6 分钟/局计，是数十小时量级的独立工程。**不得当作已知结论，也不得混进迁移里假装顺手做完。**
 
 ---
 
@@ -715,6 +764,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | `RK-03` | 评测本身引入方差，N 局不足以区分 A/B | `开放` | W-02 的反向守卫（逐字节可复现）+ 加大 N |
 | `RK-04` | F-010 未实测，Anthropic 协议下的具体报错未知 | `开放` | W-01 完成后立即实测 |
 | `RK-05` | Skill 拆分把 doctrine 切碎后，模型跨 skill 推理出现断层 | `开放` | 由 W-05 的 A/B 消解 |
+| `RK-07` | 基线 7 局 0 胜负，4 局因三次重复局面和棋——模型在反复兜圈子 | `开放` | 回合预算 40 手下胜负不可观测；需更长预算 + 决策契约。基线报告的 `warnings` 已自述该限制 |
 | `RK-06` | 渐进披露反而增加往返（读 skill → 用 skill 多一轮 LLM 调用） | `开放` | W-05 需统计 LLM 调用次数，不只看胜率 |
 
 ---
@@ -724,7 +774,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | 工作项 | 状态 | 门禁结果 | 日期 |
 |---|---|---|---|
 | `W-00` thinking 开关 | `完成` | F-017 消解：两家 `finish=stop`、content 非空、走步合法 | 2026-10-08 |
-| `W-02` 评测基线 | `待做` | — | — |
+| `W-02` 评测基线 | `完成` | 7 局 0 胜负；3 局截断、4 局重复和棋；报告已自述该限制 | 2026-10-08 |
 | `W-01` 协议修复 | `待做` | — | — |
 | `W-03` 决策契约 | `待做` | — | — |
 | `W-04` BoardSnapshot | `待做` | — | — |
