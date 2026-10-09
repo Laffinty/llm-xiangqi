@@ -976,7 +976,7 @@ tools = [{
         }
     }
 }]
-tool_choice = "auto"
+tool_choice = "required"   # 被拒则回落 "auto"
 ```
 
 **三条已实测的供应商约束（实现时不得违反）：**
@@ -984,15 +984,15 @@ tool_choice = "auto"
 | # | 约束 | 来源 |
 |---|---|---|
 | C-1 | `strict` 必须放在函数定义内，不能放 `response_format: json_schema` | DeepSeek 返回 400 `This response_format type is unavailable now` |
-| C-2 | 不得使用 `tool_choice: "required"` | DeepSeek 返回 400 `Thinking mode does not support this tool_choice` |
+| C-2 | 用 `tool_choice: "required"` 才有确定性；**thinking 开启时** DeepSeek 返回 400 | `Thinking mode does not support this tool_choice`（thinking 关闭后两家均可用，见 `F-013` 修订） |
 | C-3 | 多轮工具调用时必须回送 `reasoning_content` | 两家均为 thinking model，缺字段会报错 |
 
 **能力矩阵（2026-10-08 实测）：**
 
 | provider | model | 函数内 strict | `response_format: json_schema` | `tool_choice: required` |
 |---|---|---|---|---|
-| DeepSeek | `deepseek-flash` | ✓ | ✗ 400 | ✗ 400 |
-| MiMo | `mimo-v2.6-flash` | ✓ | ✓ | 未测 |
+| DeepSeek | `deepseek-flash` | ✓ | ✗ 400 | ✓（thinking 关闭时） |
+| MiMo | `mimo-v2.6-flash` | ✓ | ✓ | ✓（thinking 关闭时；named-function 形式不支持） |
 
 非 strict 时 DeepSeek 实测吐出过语法错误的 JSON arguments，说明 `strict` 真实收紧了输出。
 

@@ -8,6 +8,9 @@ agent:
   retry_delay: 2
   use_tools: false
   use_reflection: false
+  # W-03 决策契约：合法走步以 enum 写入 strict schema，
+  # 使模型物理上无法输出非法走步。见 docs/skill-mode-design.md D-05 / F-012 / F-013。
+  decision_contract: true
 
 llm:
   provider: "mimo"

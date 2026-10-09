@@ -12,6 +12,8 @@ from enum import Enum
 
 from ..llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
 from .prompt_builder import PromptBuilder
+from .decision_contract import DECISION_TOOL_NAME
+from . import decision_contract
 from ..utils.logger import get_logger
 
 
@@ -69,6 +71,9 @@ class AgentConfig:
     retry_delay: int = 2
     use_tools: bool = True
     use_reflection: bool = False  # ReflAct式反思，默认关闭节省token
+    # W-03 决策契约：合法走步以 enum 写入 schema。
+    # 默认关闭 —— 开启会改变行为，必须显式开启。
+    use_decision_contract: bool = False
 
 
 @dataclass
@@ -90,6 +95,8 @@ class BaseAgent(ABC):
         self.prompt_builder = PromptBuilder(config.system_prompt)
         self.status = AgentStatus.IDLE
         self.last_response: Optional[LLMResponse] = None
+        # 本回合的合法走步：续生成时仍需它构造决策契约的 enum
+        self._last_legal_moves: List[str] = []
 
     @abstractmethod
     async def think(self, game_state: GameStateDict) -> AgentResult:
@@ -102,6 +109,23 @@ class BaseAgent(ABC):
             AgentResult: 决策结果
         """
         pass
+
+    def _tools_for_turn(self, legal_moves: List[str]) -> Optional[List[Dict[str, Any]]]:
+        """本回合要暴露给模型的工具列表。
+
+        决策契约工具（答案出口）与棋盘能力工具（查询）是两回事，
+        但可以同时暴露。契约开启但局面无合法走步时不给契约工具——
+        此时应由引擎判定终局，不该让模型去编一个走法。
+        """
+        tools: List[Dict[str, Any]] = []
+        if self.config.use_decision_contract:
+            tool = decision_contract.build_tool(legal_moves)
+            if tool:
+                tools.append(tool)
+        if self.config.use_tools:
+            tools.extend(self.prompt_builder.get_tools())
+        return tools or None
+
 
     MAX_TOOL_ITERATIONS = 3
 
@@ -127,6 +151,13 @@ class BaseAgent(ABC):
 
         for _ in range(self.MAX_TOOL_ITERATIONS):
             if not current_response.has_tool_calls():
+                break
+            # move_decision 是答案出口而非棋盘能力，不得尝试执行它
+            current_response.tool_calls = [
+                tc for tc in current_response.tool_calls
+                if tc.get("name") != DECISION_TOOL_NAME
+            ]
+            if not current_response.tool_calls:
                 break
 
             assistant_msg = {
@@ -195,7 +226,7 @@ class BaseAgent(ABC):
 
         return await self.config.llm_adapter.chat(
             messages,
-            tools=self.prompt_builder.get_tools() if self.config.use_tools else None
+            tools=self._tools_for_turn(self._last_legal_moves or []),
         )
 
     async def _reflect_on_tools(self, tool_results: List[Dict[str, Any]]) -> Optional[str]:

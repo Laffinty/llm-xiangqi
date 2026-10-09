@@ -92,6 +92,7 @@ def _load_agent(config_file: str) -> LLMAgent:
         max_retries=agent_data.get("max_retries", 3),
         use_tools=agent_data.get("use_tools", False),
         use_reflection=agent_data.get("use_reflection", False),
+        use_decision_contract=bool(agent_data.get("decision_contract", False)),
     )
 
     return LLMAgent(agent_cfg)

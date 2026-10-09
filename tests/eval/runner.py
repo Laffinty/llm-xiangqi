@@ -43,6 +43,7 @@ def build_agent(slot: int, adapter, color: str, name: str, temperature: float) -
         max_retries=agent_data.get("max_retries", 3),
         use_tools=agent_data.get("use_tools", False),
         use_reflection=agent_data.get("use_reflection", False),
+        use_decision_contract=bool(agent_data.get("decision_contract", False)),
     )
     # AgentConfig 不带 temperature，它随 adapter 走；在 adapter 上设置
     adapter.temperature = temperature

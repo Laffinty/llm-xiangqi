@@ -199,14 +199,44 @@ response_format = {"type": "json_schema", "json_schema": {"strict": True, ...}}
 官方文档标注 Json Output 为「✓」，但**不包含 `json_schema` 子类型**。
 **因此 v0.4.0 api-standard §7.6 初稿里写的 `response_format` 方案对 DeepSeek 不成立，已改为函数定义内 `strict` 方案。**
 
-### F-013 DeepSeek 不支持 `tool_choice: "required"` —— `已核实`
+### F-013 `tool_choice: "required"` 能否使用**取决于 thinking 模式** —— `已核实（2026-10-09 修订）`
 
-```
-tool_choice = "required"  -> 400 {"message": "Thinking mode does not support this tool_choice"}
-```
+**本条最初记为「DeepSeek 不支持 `required`」，那是错的——它是在 thinking 开启时测的。**
+thinking 关闭后（W-00）复测，三种组合全部在 `thinking: disabled` 下进行：
 
-`tool_choice: "auto"` 与不传 `tool_choice` 均正常。
-**代表：不能用 `required` 来强制模型必须调函数。**
+| | `auto` | `required` | `{"type":"function","function":{"name":...}}` |
+|---|---|---|---|
+| DeepSeek | OK | **OK** | OK |
+| MiMo | OK | **OK** | **不支持** |
+
+**教训**：这条错误能存在，是因为我把「在配置 A 下观测到的现象」写成了「供应商的能力边界」。
+后来 W-00 改了 thinking，F-013 就失效了——**事实的有效范围必须和观测条件一起记录**，
+否则观测条件一变，事实就成了假知识。
+
+推论：契约要用 `required` 才有确定性；`auto` 之下模型是否调用工具会随 prompt 复杂度漂移。
+
+证伪命令：把 `config/agentX_config.yaml` 的 `thinking` 改回 true 后重跑上表，
+若 `required` 再次被拒则本条成立。
+
+---
+
+### F-024 契约命中率：auto 下 3/6，生产路径 `required` 下 10/10 —— `已核实`
+
+先用手搓请求测（完整对局 prompt），再改走**生产路径** `LLMAgent.think()`：
+
+| 路径 | DeepSeek | MiMo | 合计 |
+|---|---|---|---|
+| `tool_choice=auto` | 3/3 | **0/3** | **3/6** |
+| `tool_choice=required`（生产路径） | 5/5 | 5/5 | **10/10** |
+
+10 次调用的走步**全部落在 enum 内**，无一例外。
+
+**MiMo 在 `auto` 之下会随 prompt 复杂度漂移**：短 prompt 能触发工具调用，
+完整对局 prompt 则完全不触发。所以「在 prompt 里加一句『必须调用』」是不够的——
+**必须用 `required` 把选择权从模型手里拿走**。
+
+实现上不把选择权交给配置项，而是**先试 `required`、被拒再回落 `auto`**：
+供应商行为会变，写死配置等于把当下的观测固化成永久假设——`F-013` 就是这么错的。
 
 ### F-014 `strict: true` 放在函数定义内 —— 两家均可用，且**它真的在起作用** —— `已核实`
 
@@ -480,7 +510,7 @@ tools = [{"type": "function", "function": {
         "additionalProperties": False
     }
 }}]
-tool_choice = "auto"     # 绝不用 "required"（F-013）
+tool_choice = "required"  # 被拒则回落 auto（F-024）
 ```
 
 该路径在 **DeepSeek 与 MiMo 两家均实测通过**（F-014），且非 strict 时 DeepSeek 实测会吐出非法 JSON——
@@ -488,7 +518,8 @@ strict 在这里是有实质作用的，不是装饰。
 
 **三条已核实的约束（写入实现时必须遵守）：**
 1. `strict` 放函数定义内，不放 `response_format`（DeepSeek 拒绝，F-012）
-2. 不得用 `tool_choice: "required"`（DeepSeek 拒绝，F-013）
+2. 用 `tool_choice: "required"` 才有确定性；thinking 开启时 DeepSeek 会拒绝（F-013），
+   故实现为「先试 required、被拒回落 auto」
 3. 两家都是 thinking model，**多轮工具调用时必须回送 `reasoning_content`**，否则会报错
 
 **降级路径仍为强制项**：若未来添加的 provider 不支持函数内 `strict`，
