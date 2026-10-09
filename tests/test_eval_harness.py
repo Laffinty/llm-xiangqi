@@ -322,3 +322,34 @@ def test_missing_metric_is_not_a_passed_gate():
         p = pathlib.Path(d) / "b.json"
         p.write_text(report.dumps(base), encoding="utf-8")
         assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 1
+
+
+def test_vacuous_activation_must_fail_the_gate():
+    """W-08：两边同时为空时一致性仍是 1.0，空激活率上限门禁必须拦下。"""
+    from tests.eval import report, run as run_mod
+    import tempfile, pathlib
+    base = report.build([_full_record(400)], {})
+    cur_rec = _full_record(400)
+    cur_rec["activations"]["Red"] = [{
+        "board_phase": None, "in_check": False, "repetition_warning": False,
+        "expected": [], "actual": [], "match": True}]   # 两边同时为空
+    cur = report.build([cur_rec], {})
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "b.json"
+        p.write_text(report.dumps(base), encoding="utf-8")
+        assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 1, \
+            "空激活率 100% 必须被绝对上限门禁拦下"
+
+
+def test_real_report_is_not_vacuous():
+    """真实报告的空激活率必须为 0，否则 1.0 的一致性意义不大。"""
+    from pathlib import Path
+    import json
+    p = Path("docs/eval-after-w05b.json")
+    if not p.exists():
+        return
+    s = json.loads(p.read_text(encoding="utf-8"))["summary"]["activation"]
+    for side in ("Red", "Black"):
+        assert s[side]["measured"], "%s 未采集激活数据" % side
+        assert s[side]["empty_rate"] == 0.0, \
+            "%s 空激活率 %s，一致性 1.0 可能是空转" % (side, s[side]["empty_rate"])

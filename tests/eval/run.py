@@ -63,6 +63,13 @@ GATES = [
     ("activation.Black.consistency", "激活一致性(黑)", "exact", None),
 ]
 
+# 绝对上限门禁（不与基线比，只看是否越界）。
+# 用于补上「一致性 1.0 也可能空转」的盲区（W-08）。
+CEILINGS = [
+    ("activation.Red.empty_rate", "空激活率(红)", 0.05),
+    ("activation.Black.empty_rate", "空激活率(黑)", 0.05),
+]
+
 # 差异小于该 p 值才算「可判定的变化」；否则一律判「不可判定」
 SIGNIFICANCE = 0.05
 
@@ -150,6 +157,21 @@ def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
 
     verdicts = []
     inconclusive = []
+    # 先审绝对上限：它不依赖基线，也不参与信量性判定
+    for path, name, cap in CEILINGS:
+        v = _dig(cur, path)
+        if v is None:
+            print("%-20s %-16s %-16s %-9s %-6s %s"
+                  % (name, "-", "-", "-", "≤%.2f" % cap, "无数据"))
+            inconclusive.append((name, None, "空激活率未采集"))
+            continue
+        ok = v <= cap
+        print("%-20s %-16s %-16s %-9s %-6s %s"
+              % (name, "上限 %.2f" % cap, v, "-", "-",
+                 "通过" if ok else "超上限"))
+        if not ok:
+            verdicts.append((name, False, "%s %s > 上限 %.2f" % (name, v, cap)))
+
     rows = list(GATES) + ([(p, l, "info", None) for p, l in INFO] if not gates_only else [])
     for row in rows:
         path, name, direction = row[0], row[1], row[2]

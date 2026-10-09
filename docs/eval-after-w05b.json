@@ -12,7 +12,8 @@
     "caveats": [
       "5 局被回合上限截断，属未完成对局，不计入和棋判断。",
       "激活一致性：红方 1.0、黑方 1.0（1.0 = 每回合激活均与局面一致）",
-      "决策来源：红方兜底率 0.0339、黑方兜底率 0.0339（0 = 全部走契约）。"
+      "决策来源：红方兜底率 0.0339、黑方兜底率 0.0339（0 = 全部走契约）。",
+      "空激活率：红方 0.0、黑方 0.0（一致性 1.0 也可能来自两边同时为空，故设绝对上限门禁）"
     ],
     "commit": "3680823",
     "dirty": false,
@@ -25,6 +26,10 @@
       "mimo": "mimo-v2.6-flash"
     },
     "note": "temperature=0 为评测设定，非仓库默认；use_tools 取自 config（当前 false）",
+    "notes": [
+      "补 empty_rate 字段（W-08 空转防护），数据由 raw 重算，未重跑对局"
+    ],
+    "restated_from_schema": "llm-xiangqi/eval-report@2",
     "seed": 42,
     "temperature": 0.0,
     "thinking": false
@@ -3641,12 +3646,16 @@
     "activation": {
       "Black": {
         "consistency": 1.0,
+        "empty": 0,
+        "empty_rate": 0.0,
         "matches": 118,
         "measured": true,
         "turns": 118
       },
       "Red": {
         "consistency": 1.0,
+        "empty": 0,
+        "empty_rate": 0.0,
         "matches": 118,
         "measured": true,
         "turns": 118
@@ -3753,6 +3762,7 @@
     "warnings": [
       "5 局被回合上限截断，属未完成对局，不计入和棋判断。",
       "激活一致性：红方 1.0、黑方 1.0（1.0 = 每回合激活均与局面一致）",
+      "空激活率：红方 0.0、黑方 0.0（一致性 1.0 也可能来自两边同时为空，故设绝对上限门禁）",
       "决策来源：红方兜底率 0.0339、黑方兜底率 0.0339（0 = 全部走契约）。"
     ]
   }

@@ -79,10 +79,16 @@ def _activation_consistency(records: List[Dict], side: str) -> Dict:
     rows = [a for r in records
             for a in (r.get("activations", {}) or {}).get(side, [])]
     if not rows:
-        return {"turns": 0, "matches": 0, "consistency": None, "measured": False}
+        return {"turns": 0, "matches": 0, "consistency": None,
+                "empty": None, "empty_rate": None, "measured": False}
     ok = sum(1 for a in rows if a.get("match"))
+    empty = sum(1 for a in rows if not a.get("actual"))
     return {"turns": len(rows), "matches": ok,
-            "consistency": round(ok / len(rows), 4), "measured": True}
+            "consistency": round(ok / len(rows), 4),
+            # 非空活性：一致性 1.0 也可能来自两边同时为空。
+            "empty": empty,
+            "empty_rate": round(empty / len(rows), 4),
+            "measured": True}
 
 
 def summarize(records: List[Dict]) -> Dict:
@@ -154,8 +160,10 @@ def _warnings(s: Dict) -> List[str]:
                  "同样不产生 tool_calls，判断走没走正则请看 move_quality.*.fallback_rate。")
     act = [s["activation"][x] for x in ("Red", "Black")]
     if all(a["measured"] for a in act):
-        w.append("\u6fc0\u6d3b\u4e00\u81f4\u6027\uff1a\u7ea2\u65b9 %s\u3001\u9ed1\u65b9 %s\uff081.0 = 每回\u5408激\u6d3b\u5747与\u5c40\u9762\u4e00\u81f4\uff09"
+        w.append("激活一致性：红方 %s、黑方 %s（1.0 = 每回合激活均与局面一致）"
                  % (act[0]["consistency"], act[1]["consistency"]))
+        w.append("空激活率：红方 %s、黑方 %s（一致性 1.0 也可能来自两边同时为空，"
+                 "故设绝对上限门禁）" % (act[0]["empty_rate"], act[1]["empty_rate"]))
     fb = [s["move_quality"][x].get("fallback_rate") for x in ("Red", "Black")]
     if all(v is not None for v in fb):
         w.append("决策来源：红方兜底率 %s、黑方兜底率 %s（0 = 全部走契约）。"
