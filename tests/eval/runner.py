@@ -65,9 +65,23 @@ class InstrumentedAgent:
         self.legal_moves = 0
         self.illegal_moves = 0
         self.parse_failures = 0
+        # 决策来源。**不能**用 content_only_turns 代替：W-03 之后 response_format
+        # 通道也不产生 tool_calls，但它同样是契约命中，不是正则兜底。
+        self.contract_hits = 0
+        self.fallbacks = 0
 
     async def think(self, game_state: Dict[str, Any]):
         result = await self._agent.think(game_state)
+        source = None
+        for tr in (getattr(result, "tool_results", None) or []):
+            if isinstance(tr, dict) and isinstance(tr.get("result"), dict):
+                source = tr["result"].get("source")
+                if source:
+                    break
+        if source in ("contract", "response_format"):
+            self.contract_hits += 1
+        else:
+            self.fallbacks += 1
         legal = set(game_state.get("legal_moves") or [])
         move = getattr(result, "move", None)
         if move is None or move == "jxjx":
@@ -93,6 +107,10 @@ class InstrumentedAgent:
             "parse_failures": self.parse_failures,
             "illegal_rate": round(
                 (self.illegal_moves + self.parse_failures) / total, 4) if total else None,
+            "contract_hits": self.contract_hits,
+            "fallbacks": self.fallbacks,
+            # 真正的“走了正则兜底”比例，门禁用它而不用 text_only_ratio
+            "fallback_rate": round(self.fallbacks / total, 4) if total else None,
         }
 
 

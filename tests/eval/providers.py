@@ -155,6 +155,15 @@ class InstrumentedAdapter(BaseLLMAdapter):
         self.max_retries = getattr(inner, "max_retries", 3)
         self.reset_stats()
 
+    def __getattr__(self, name):
+        # 透明包装的完整定义：被测代码能读到的任何属性，包装层都得能读到。
+        # 否则包装会静默改变被测行为——已经曾因此让 MiMo 误走
+        # tool_choice 通道（它会忽视 required），从而把契约背去了（F-027）。
+        if name == "inner":
+            raise AttributeError(name)
+        return getattr(self.inner, name)
+
+
     def reset_stats(self) -> None:
         self.llm_calls = 0
         self.tool_call_turns = 0

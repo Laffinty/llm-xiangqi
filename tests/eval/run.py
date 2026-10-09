@@ -42,13 +42,15 @@ def _diff_mode(extra_args) -> bool:
 GATES = [
     ("move_quality.Red.illegal_rate", "非法走步率(红)", "down"),
     ("move_quality.Black.illegal_rate", "非法走步率(黑)", "down"),
-    ("sides.Red.text_only_ratio", "正则兜底占比(红)", "down"),
-    ("sides.Black.text_only_ratio", "正则兜底占比(黑)", "down"),
+    ("move_quality.Red.fallback_rate", "正则兜底率(红)", "down"),
+    ("move_quality.Black.fallback_rate", "正则兜底率(黑)", "down"),
     ("sides.Red.errors", "调用错误(红)", "down"),
     ("sides.Black.errors", "调用错误(黑)", "down"),
 ]
 # 仅记录不设门禁：成本与速度变化是取舍，不是回归
 INFO = [
+    ("sides.Red.text_only_ratio", "工具调用占比(红)"),
+    ("sides.Black.text_only_ratio", "工具调用占比(黑)"),
     ("mean_tokens_per_turn", "每手 token"),
     ("mean_elapsed_sec", "每局秒数"),
     ("mean_ply", "平均 ply"),

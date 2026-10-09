@@ -46,7 +46,9 @@ def _record(**kw):
                       "completion_tokens": 5, "total_tokens": 15, "errors": 0}
                   for s in ("Red", "Black")},
         "move_quality": {s: {"decisions": 1, "legal": 1, "illegal": 0,
-                            "parse_failures": 0, "illegal_rate": 0.0}
+                            "parse_failures": 0, "illegal_rate": 0.0,
+                            "contract_hits": 1, "fallbacks": 0,
+                            "fallback_rate": 0.0}
                         for s in ("Red", "Black")},
     }
     base.update(kw)
@@ -85,9 +87,11 @@ def test_compare_flags_regression(capsys):
     base_doc = report.build([_record()], {})
     cur_doc = report.build([_record(move_quality={
         "Red": {"decisions": 1, "legal": 0, "illegal": 1,
-                "parse_failures": 0, "illegal_rate": 1.0},
+                "parse_failures": 0, "illegal_rate": 1.0,
+                "contract_hits": 0, "fallbacks": 1, "fallback_rate": 1.0},
         "Black": {"decisions": 1, "legal": 1, "illegal": 0,
-                  "parse_failures": 0, "illegal_rate": 0.0}})], {})
+                  "parse_failures": 0, "illegal_rate": 0.0,
+                  "contract_hits": 1, "fallbacks": 0, "fallback_rate": 0.0}})], {})
     import tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as d:
@@ -100,9 +104,11 @@ def test_compare_flags_regression(capsys):
 def test_compare_passes_on_improvement(tmp_path):
     base_doc = report.build([_record(move_quality={
         "Red": {"decisions": 1, "legal": 0, "illegal": 1,
-                "parse_failures": 0, "illegal_rate": 1.0},
+                "parse_failures": 0, "illegal_rate": 1.0,
+                "contract_hits": 0, "fallbacks": 1, "fallback_rate": 1.0},
         "Black": {"decisions": 1, "legal": 1, "illegal": 0,
-                  "parse_failures": 0, "illegal_rate": 0.0}})], {})
+                  "parse_failures": 0, "illegal_rate": 0.0,
+                  "contract_hits": 1, "fallbacks": 0, "fallback_rate": 0.0}})], {})
     cur_doc = report.build([_record()], {})
     p = tmp_path / "base.json"
     p.write_text(report.dumps(base_doc), encoding="utf-8")
@@ -152,3 +158,50 @@ def test_masked_key_never_leaks_full_value():
     assert providers.mask(fake).startswith("sk-")
     assert fake[3:] not in providers.mask(fake)
     assert len(providers.mask(fake)) < len(fake)
+
+# ------------------------------------------------ 包装层透明性
+
+
+def test_instrumented_adapter_is_attribute_transparent():
+    """F-027: 包装层不得隐藏被测代码能读到的属性。
+
+    已经因此真实事故：能力位 `supports_response_format_json_schema` 存在真适配器上、
+    不存在包装层上，使评测流程中 MiMo 误走工具调用通道，
+    抬高了其兜底率。README 写的「对被测代码完全不可见」被自己破坏。
+    """
+    from src.llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
+
+    class _Inner(BaseLLMAdapter):
+        supports_response_format_json_schema = True
+        custom_flag = "visible"
+
+        async def chat(self, messages, tools=None, **kw):
+            return LLMResponse(content="")
+
+        async def close(self):
+            pass
+
+    inner = _Inner(api_key="k", model="m", base_url="b")
+    wrapper = providers.InstrumentedAdapter(inner)
+
+    assert wrapper.supports_response_format_json_schema is True
+    assert wrapper.custom_flag == "visible"
+    with pytest.raises(AttributeError):
+        wrapper.definitely_not_a_real_attribute
+
+
+def test_wrapper_does_not_shadow_own_attributes():
+    from src.llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
+
+    class _Inner(BaseLLMAdapter):
+        async def chat(self, messages, tools=None, **kw):
+            return LLMResponse(content="")
+
+        async def close(self):
+            pass
+
+    inner = _Inner(api_key="k", model="m", base_url="b")
+    wrapper = providers.InstrumentedAdapter(inner)
+    wrapper.model = "overridden"
+    assert wrapper.model == "overridden", "包装层自身的属性不应被 __getattr__ 接管"
+    assert wrapper.inner.model == "m"

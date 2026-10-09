@@ -49,7 +49,7 @@ def _move_quality(records: List[Dict], side: str) -> Dict:
     illegal = sum(r["move_quality"][side]["illegal"] for r in present)
     fails = sum(r["move_quality"][side]["parse_failures"] for r in present)
     total = legal + illegal + fails
-    return {
+    out = {
         "decisions": total,
         "legal": legal,
         "illegal": illegal,
@@ -57,6 +57,17 @@ def _move_quality(records: List[Dict], side: str) -> Dict:
         "illegal_rate": round((illegal + fails) / total, 4) if total else None,
         "measured": True,
     }
+    if any("fallback_rate" in r["move_quality"][side] for r in present):
+        fb = sum(r["move_quality"][side].get("fallbacks", 0) for r in present)
+        hits = sum(r["move_quality"][side].get("contract_hits", 0) for r in present)
+        out["fallbacks"] = fb
+        out["contract_hits"] = hits
+        out["fallback_rate"] = round(fb / total, 4) if total else None
+    else:
+        out["fallbacks"] = None
+        out["contract_hits"] = None
+        out["fallback_rate"] = None
+    return out
 
 
 def summarize(records: List[Dict]) -> Dict:
@@ -121,8 +132,13 @@ def _warnings(s: Dict) -> List[str]:
         w.append("%d 局被回合上限截断，属未完成对局，不计入和棋判断。"
                  % s["outcome"]["draw_by_cap"])
     if s["sides"]["Red"]["text_only_ratio"] == 1.0 and s["sides"]["Black"]["text_only_ratio"] == 1.0:
-        w.append("双方 text_only_ratio 均为 1.0：从未发生工具调用，"
-                 "全部走步经由正则从自由文本提取（use_tools=false）。")
+        w.append("双方 text_only_ratio 均为 1.0：从未发生工具调用。注意该指标测的是"
+                 "**传输方式**而非**决策路径**——W-03 之后 response_format 通道"
+                 "同样不产生 tool_calls，判断走没走正则请看 move_quality.*.fallback_rate。")
+    fb = [s["move_quality"][x].get("fallback_rate") for x in ("Red", "Black")]
+    if all(v is not None for v in fb):
+        w.append("决策来源：红方兜底率 %s、黑方兜底率 %s（0 = 全部走契约）。"
+                 % (fb[0], fb[1]))
     if not s["move_quality"]["Red"]["measured"]:
         w.append("本批未采集 move_quality（非法走步率）：该指标在这份报告采集时尚不存在，"
                  "不能与后续报告比较，需重新采集基线。")

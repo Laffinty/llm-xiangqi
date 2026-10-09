@@ -503,6 +503,35 @@ mimo      middlegame_p25    src=response_format  move=b4e4  legal=True
 但其中 4 项的改善全部来自单一供应商；另一侧的 0.01 改善是 2 次失败变 1 次，
 在 N≈115 下不构成证据。**门禁需要按侧拆分才能看出这种不对称**。
 
+### F-027 评测包装层静默改变了被测系统 —— `已核实`
+
+`W-03` 双通道跑批后，黑方 `fallback_rate` 高达 **0.644**（135 次决策里 87 次走了兜底），
+而单次调用实测是 4/4 全中。差距这么大，必有原因。
+
+**排查过程**：先怀疑是 markdown 围栏（MiMo 曾输出 ```json 包裹）——
+**实测否证**：单次调用下 MiMo 0 围栏、7/7 解析成功。
+
+**真因**：`supports_response_format_json_schema` 标在**真适配器**上，
+而 `InstrumentedAgent` 外面还包了一层 `InstrumentedAdapter`。
+`getattr(adapter, "supports_response_format_json_schema", False)` 在包装层上返回 False，
+于是 **MiMo 被派到了工具调用通道**——正是它会无视的那条（`F-024`/`F-025`）。
+
+```
+deepseek  inner=False  wrapper=<absent>
+mimo      inner=True   wrapper=<absent>     <- 能力位丢了
+```
+
+**生产路径不受影响**：`game.py::_create_adapter` 返回的是裸适配器，不经包装。
+所以这是**评测专用缺陷**，此前那份 0.644 是被污染的数字，不能用来判断 MiMo 的真实行为。
+
+**教训**：`tests/eval/README.md` 自己写着「它必须对被测代码完全不可见」——
+**这句话正是被我自己破坏的**。计量层的「透明」是一个需要测试保证的性质，
+不是一个可以靠自觉维持的约定。已补 2 条测试（`test_instrumented_adapter_is_attribute_transparent`
+与 `test_wrapper_does_not_shadow_own_attributes`），并给包装层加 `__getattr__` 代理。
+
+**更大的教训**：**先证伪再下结论**。我这次第一反应就是「围栏」，若没有实测就写进文档，
+会又多一条错的事实——和 `F-013` 同一类错误。
+
 ## §2 裁决
 
 以下 `D-xx` 均为 `已裁决`。每条附**被否决的方案及否决理由**——这是为了避免后来者重新提出同一方案。
