@@ -50,6 +50,11 @@ def _record(**kw):
                             "contract_hits": 1, "fallbacks": 0,
                             "fallback_rate": 0.0}
                         for s in ("Red", "Black")},
+        "activations": {s: [{"board_phase": "middlegame", "in_check": False,
+                             "repetition_warning": False,
+                             "expected": ["middlegame-tactics"],
+                             "actual": ["middlegame-tactics"], "match": True}]
+                        for s in ("Red", "Black")},
     }
     base.update(kw)
     return base
@@ -226,9 +231,14 @@ def _full_record(n, illegal=0, fails=0, fb=0, errors=0):
         st[side] = {"llm_calls": n, "content_only_turns": 0, "text_only_ratio": 0.0,
                     "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
                     "errors": errors}
-    return {"stats": st, "move_quality": mq, "elapsed_sec": 1.0,
-            "turn_count": n, "category": "x", "aborted": None,
-            "result": "draw", "result_reason": "r"}
+    act = {s: [{"board_phase": "middlegame", "in_check": False,
+                "repetition_warning": False,
+                "expected": ["middlegame-tactics"],
+                "actual": ["middlegame-tactics"], "match": True}]
+           for s in ("Red", "Black")}
+    return {"stats": st, "move_quality": mq, "activations": act,
+            "elapsed_sec": 1.0, "turn_count": n, "category": "x",
+            "aborted": None, "result": "draw", "result_reason": "r"}
 
 
 def test_counts_are_read_from_parent_node():
@@ -282,3 +292,33 @@ def test_inconclusive_row_is_not_silently_passed(capsys):
     out = capsys.readouterr().out
     assert "不可判定" in out
     assert "未做判定" in out
+
+
+def test_activation_consistency_must_be_one():
+    """方案 B：激活不一致就是接线断了，必须拦下来。"""
+    from tests.eval import report, run as run_mod
+    import tempfile, pathlib
+    base = report.build([_full_record(400)], {})
+    cur_rec = _full_record(400)
+    cur_rec["activations"]["Red"][0]["match"] = False
+    cur_rec["activations"]["Red"][0]["actual"] = ["endgame-technique"]
+    cur = report.build([cur_rec], {})
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "b.json"
+        p.write_text(report.dumps(base), encoding="utf-8")
+        assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 1, \
+            "激活不一致必须判失败"
+
+
+def test_missing_metric_is_not_a_passed_gate():
+    """缺指标必须告失败，不能被读成「门禁全部通过」。"""
+    from tests.eval import report, run as run_mod
+    import tempfile, pathlib
+    base = report.build([_full_record(400)], {})
+    cur_rec = _full_record(400)
+    cur_rec.pop("activations", None)
+    cur = report.build([cur_rec], {})
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "b.json"
+        p.write_text(report.dumps(base), encoding="utf-8")
+        assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 1

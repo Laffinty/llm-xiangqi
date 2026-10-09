@@ -16,6 +16,8 @@ from src.agents.prompt_builder import PromptBuilder
 from src.utils.config_loader import ConfigLoader
 
 from . import providers
+from src.skills import registry as skills_registry
+from src.skills import router as skills_router
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_CFG = {1: "agent1_config.yaml", 2: "agent2_config.yaml"}
@@ -70,9 +72,13 @@ class InstrumentedAgent:
         # 通道也不产生 tool_calls，但它同样是契约命中，不是正则兜底。
         self.contract_hits = 0
         self.fallbacks = 0
+        # W-07：每回合的实际激活组合 + 当时局面特征，用于验证运行时接线
+        self.activations = []
 
     async def think(self, game_state: Dict[str, Any]):
         result = await self._agent.think(game_state)
+        self._record_activation(game_state)
+
         source = None
         for tr in (getattr(result, "tool_results", None) or []):
             if isinstance(tr, dict) and isinstance(tr.get("result"), dict):
@@ -92,6 +98,21 @@ class InstrumentedAgent:
         else:
             self.illegal_moves += 1
         return result
+
+    def _record_activation(self, game_state):
+        """记下本回合实际激活了什么，以及当时局面蕴含的应当激活什么。"""
+        snap = game_state.get("snapshot") or {}
+        reg = skills_registry.load_skills()
+        expected = [s.name for s in skills_router.resolve(reg, snap)] if len(reg) else []
+        actual = list(getattr(self._agent.prompt_builder, "active_skills", []))
+        self.activations.append({
+            "board_phase": snap.get("board_phase"),
+            "in_check": bool(snap.get("in_check")),
+            "repetition_warning": bool(snap.get("repetition_warning")),
+            "expected": expected,
+            "actual": actual,
+            "match": expected == actual,
+        })
 
     def add_correction_feedback(self, *a, **kw):
         return self._agent.add_correction_feedback(*a, **kw)
@@ -171,6 +192,7 @@ async def play_case(
         "elapsed_sec": round(elapsed, 2),
         "stats": {"Red": red_adapter.stats(), "Black": black_adapter.stats()},
         "move_quality": {"Red": red.move_quality(), "Black": black.move_quality()},
+        "activations": {"Red": red.activations, "Black": black.activations},
     }
 
 

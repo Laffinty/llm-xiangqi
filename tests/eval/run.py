@@ -56,6 +56,11 @@ GATES = [
      (["fallbacks"], "decisions")),
     ("sides.Red.errors", "调用错误(红)", "down", (["errors"], "llm_calls")),
     ("sides.Black.errors", "调用错误(黑)", "down", (["errors"], "llm_calls")),
+    # 方案 B（W-07）：激活一致性必须为 1.0。它不是比率相决，
+    # 而是是否是“每一回合的实际激活都等于局面提示的应激活”——
+    # 不适用显著性判断：任一回合不匹配就是接线断了。
+    ("activation.Red.consistency", "激活一致性(红)", "exact", None),
+    ("activation.Black.consistency", "激活一致性(黑)", "exact", None),
 ]
 
 # 差异小于该 p 值才算「可判定的变化」；否则一律判「不可判定」
@@ -178,10 +183,16 @@ def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
             continue
 
         delta = round(c - b, 4)
-        ok = c <= b if direction == "down" else c >= b
+        if direction == "exact":
+            ok = (c == 1.0) if c is not None else None
+        else:
+            ok = c <= b if direction == "down" else c >= b
 
         # 判定矩阵（别写错：显著退化必须失败，不能因为“有 spec”就放过）
-        if spec and pv is None:
+        if ok is None:
+            verdict = "不可判定"
+            inconclusive.append((name, None, "无数据"))
+        elif spec and pv is None:
             verdict = "通过" if ok else "不可判定"
             if not ok:
                 inconclusive.append((name, None, counts.strip()))

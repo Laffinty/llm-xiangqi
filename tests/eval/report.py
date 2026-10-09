@@ -70,6 +70,21 @@ def _move_quality(records: List[Dict], side: str) -> Dict:
     return out
 
 
+def _activation_consistency(records: List[Dict], side: str) -> Dict:
+    """统计「实际激活 == 局面蕴含的应激活」的比例。
+
+    比值 < 1 说明运行时接线与路由规则脱节了（快照为 None、
+    current_user_turn 过期、reset 未清干净等）。无数据时返回 measured=False。
+    """
+    rows = [a for r in records
+            for a in (r.get("activations", {}) or {}).get(side, [])]
+    if not rows:
+        return {"turns": 0, "matches": 0, "consistency": None, "measured": False}
+    ok = sum(1 for a in rows if a.get("match"))
+    return {"turns": len(rows), "matches": ok,
+            "consistency": round(ok / len(rows), 4), "measured": True}
+
+
 def summarize(records: List[Dict]) -> Dict:
     """从原始记录计算汇总。纯函数：同样的 raw 必得同样的 summary。"""
     kinds = [classify(r) for r in records]
@@ -115,6 +130,8 @@ def summarize(records: List[Dict]) -> Dict:
         "sides": {"Red": side_totals("Red"), "Black": side_totals("Black")},
         "move_quality": {"Red": _move_quality(records, "Red"),
                          "Black": _move_quality(records, "Black")},
+        "activation": {"Red": _activation_consistency(records, "Red"),
+                       "Black": _activation_consistency(records, "Black")},
         "by_category": by_category,
         "result_reasons": sorted({r.get("result_reason") or "" for r in records}),
     }
@@ -135,6 +152,10 @@ def _warnings(s: Dict) -> List[str]:
         w.append("双方 text_only_ratio 均为 1.0：从未发生工具调用。注意该指标测的是"
                  "**传输方式**而非**决策路径**——W-03 之后 response_format 通道"
                  "同样不产生 tool_calls，判断走没走正则请看 move_quality.*.fallback_rate。")
+    act = [s["activation"][x] for x in ("Red", "Black")]
+    if all(a["measured"] for a in act):
+        w.append("\u6fc0\u6d3b\u4e00\u81f4\u6027\uff1a\u7ea2\u65b9 %s\u3001\u9ed1\u65b9 %s\uff081.0 = 每回\u5408激\u6d3b\u5747与\u5c40\u9762\u4e00\u81f4\uff09"
+                 % (act[0]["consistency"], act[1]["consistency"]))
     fb = [s["move_quality"][x].get("fallback_rate") for x in ("Red", "Black")]
     if all(v is not None for v in fb):
         w.append("决策来源：红方兜底率 %s、黑方兜底率 %s（0 = 全部走契约）。"
