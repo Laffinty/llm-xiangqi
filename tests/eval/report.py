@@ -6,7 +6,9 @@ import json
 from typing import Dict, List
 
 # game_controller.GameEndReasons
-CAP_REASONS = ("Maximum turns reached", "Stalemate", "�϶�Ŀ���")
+# 被回合上限截断的对局原因。注意：这里只放“未完成”的原因，
+# 自然和棋（例如三次重复）不在其中——它们是真结果。
+CAP_REASONS = ("Maximum turns reached", "Stalemate")
 
 
 def _round(x, nd=2):

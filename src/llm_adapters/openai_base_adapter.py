@@ -66,7 +66,7 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
 
         # 深度求两家都是 thinking model。开着 thinking 时思维链会吃光
         # max_tokens，content 返回空字符串、走步只能从截断的思考里正则刨
-        # （见 docs/skill-mode-design.md 事实 F-017）。thinking=None 表示
+        # （见 docs/history/skill-mode-design.md 事实 F-017）。thinking=None 表示
         # 不干预，交给供应商默认行为。
         thinking = kwargs.get("thinking", self.thinking)
         if thinking is not None:

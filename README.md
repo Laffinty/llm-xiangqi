@@ -87,7 +87,8 @@ RefereeEngine ──► BoardSnapshot ──► SkillRouter ──► system pro
 - **决策契约** — 合法走法作为 `enum` 写进 schema，走步由结构保证而非正则兜底
 - **`ToolExecutor`** — 棋盘能力工具的唯一事实来源
 
-详细设计见 `docs/skill-mode-design.md`，通信契约见 `docs/api-standard.md`。
+通信契约见 `docs/api-standard.md`。待解决问题见 `docs/open-questions.md`；
+本轮迁移的计划、裁决与证据已归档至 `docs/history/`。
 
 ---
 

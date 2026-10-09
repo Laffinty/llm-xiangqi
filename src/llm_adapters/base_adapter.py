@@ -72,7 +72,7 @@ class BaseLLMAdapter(ABC):
         self.temperature = temperature
         self.max_tokens = max_tokens
         # None = 不干预，用供应商默认；True/False = 显式开关思维链。
-        # 见 docs/skill-mode-design.md 事实 F-017 / F-018。
+        # 见 docs/history/skill-mode-design.md 事实 F-017 / F-018。
         self.thinking = thinking
     
     async def __aenter__(self):

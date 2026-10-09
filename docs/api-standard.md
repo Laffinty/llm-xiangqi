@@ -9,7 +9,7 @@
 > **v0.4.0 变更说明**
 > 本次更新引入 Skill 模式契约（LLM ↔ 棋盘实测的结构化交互协议），并修正 v0.3.0 描述中一处**协议性错误**：
 > v0.3.0 只描述了 `chat()` 的**输入**形式，未约束**输出**序列如何构造——而实现与那个形式不一致（详见 §3.4）。
-> 新契约的正确性依据、实施顺序与验收门禁，见 `docs/skill-mode-design.md`（`PLAN-SKILL-001`）。
+> 新契约的正确性依据、实施顺序与验收门禁，见 `docs/history/skill-mode-design.md`（`PLAN-SKILL-001`）。
 
 ---
 
@@ -44,7 +44,7 @@
 
 ### 0.2 与其它文档的关系
 
-- `docs/skill-mode-design.md` — **实施计划与验收门禁**，本文档只定义「契约长什么样」
+- `docs/history/skill-mode-design.md` — **实施计划与验收门禁**，本文档只定义「契约长什么样」
 - `docs/history/optimization-plan.md` — **已停用**，仅作缺陷史参考
 
 ---
@@ -379,7 +379,7 @@ class LLMResponse:
 **tool_calls 格式**（`设计态`）:
 
 > `id` 字段为新增。**当前现网 `ToolCallDict` 仅有 `{name, arguments}`，协议上无法回填工具结果**。
-> 实施见 `docs/skill-mode-design.md` 工作项 `W-01`。
+> 实施见 `docs/history/skill-mode-design.md` 工作项 `W-01`。
 
 ```python
 [
@@ -821,7 +821,7 @@ print(response.tool_calls)  # 工具调用（如有）
 > 原「MCP 工具层」已降级为 `已废弃`（§7.5）。其实现存在两处已核实缺陷：
 > ① LLM 实际看到的 schema 来自 `prompt_builder.py` 的硬编码常量，与工具注册表无关；
 > ② `ToolExecutor.get_tool_schemas()` 零调用点。
-> 迁移计划见 `docs/skill-mode-design.md` 工作项 `W-06`。
+> 迁移计划见 `docs/history/skill-mode-design.md` 工作项 `W-06`。
 
 ### 7.1 Skill 分类
 
@@ -998,7 +998,7 @@ tool_choice = "required"   # 被拒则回落 "auto"
 
 **降级路径为强制项**：未来新增的 provider 若不支持函数内 `strict`，
 回退到非 strict + 本地 schema 校验 + 单次纠错，且**降级路径必须单独评测**。
-证据与完整探测记录见 `docs/skill-mode-design.md` §F-011 ~ §F-016。
+证据与完整探测记录见 `docs/history/skill-mode-design.md` §F-011 ~ §F-016。
 
 ---
 

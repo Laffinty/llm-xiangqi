@@ -9,7 +9,7 @@ agent:
   use_tools: false
   use_reflection: false
   # W-03 决策契约：合法走步以 enum 写入 strict schema，
-  # 使模型物理上无法输出非法走步。见 docs/skill-mode-design.md D-05 / F-012 / F-013。
+  # 使模型物理上无法输出非法走步。见 docs/history/skill-mode-design.md D-05 / F-012 / F-013。
   decision_contract: true
   # W-05：启用后 system prompt 由 base.md + skill manifest + 按局面激活的正文组装，
   # 替代 agent_default.txt 的全量常驻。任何一个局面组合都比原常驻省 token（最多 -41%）。
@@ -23,7 +23,7 @@ llm:
   temperature: 0.7
   max_tokens: 2048
   # 深度求是 thinking model：开着思维链会吃光 max_tokens，content 返回空，
-  # 走步只能从截断的思考里正则刨（docs/skill-mode-design.md F-017/F-018）。
+  # 走步只能从截断的思考里正则刨（docs/history/skill-mode-design.md F-017/F-018）。
   # 实测关闭后 2.3s/手、content 必非空、走步合法；开启则 41-130s/手 且可能截断。
   thinking: false
   timeout: 30

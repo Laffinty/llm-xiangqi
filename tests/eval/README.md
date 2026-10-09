@@ -1,7 +1,7 @@
 # tests/eval — 对局评测 harness（`W-02`）
 
 为 Skill 模式重构建立**可复现的棋力基线**。本 harness 的存在理由见
-`docs/skill-mode-design.md` 裁决 `D-08`：度量必须先于重构，否则「变好了没」无法证伪。
+`docs/history/skill-mode-design.md` 裁决 `D-08`：度量必须先于重构，否则「变好了没」无法证伪。
 
 ## 原则
 
@@ -84,8 +84,10 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
 ## 已知问题
 
 首轮实跑发现：当前 `max_tokens: 2048` 会被思维链吃光，模型**从未写出答案**，
-走步全靠从截断的思考文本里正则刨。详见 `docs/skill-mode-design.md` 事实 `F-017`
+走步全靠从截断的思考文本里正则刨。详见 `docs/history/skill-mode-design.md` 事实 `F-017`
 与工作项 `W-00`。基线采集应在 `W-00` 之后进行，否则 before 本身是坏的。
+评测报告的角色与当前基准见 `docs/open-questions.md`；本轮迁移的证据链在 `docs/history/skill-mode-design.md`。
+
 ## 门禁（`--compare`）
 
 `--compare` 会跑局后逐项对比基线，按固定方向判定。方向写死在 `run.py:GATES`，

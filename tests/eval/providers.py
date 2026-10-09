@@ -3,7 +3,7 @@
 密钥来源优先级与冲突处理见 load_keys()——那里刻意不做「静默优先级」。
 
 设计文档中记录的能力结论来自 2026-10-08 的真实探测，
-证据记录在 docs/skill-mode-design.md 的 F-011 ~ F-016。
+证据记录在 docs/history/skill-mode-design.md 的 F-011 ~ F-016。
 --probe 可随时复验连通性。
 """
 import os
@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 from src.llm_adapters.base_adapter import BaseLLMAdapter, LLMResponse
 
-# 2026-10-08 实测结论（证据见 docs/skill-mode-design.md F-011~F-016）。
+# 2026-10-08 实测结论（证据见 docs/history/skill-mode-design.md F-011~F-016）。
 # 这些不是文档摘抄，是探测结果。
 # 与 config/agentX_config.yaml 保持一致。None = 不干预供应商默认。
 THINKING: Optional[bool] = False
