@@ -10,6 +10,7 @@
     python -m tests.eval.run --probe --api-file C:\\path\\to\\TEST_API.txt
 """
 import argparse
+import math
 import asyncio
 import json
 import subprocess
@@ -39,14 +40,27 @@ def _diff_mode(extra_args) -> bool:
 
 
 # 门禁：这些指标**不允许变差**。方向已在 W-xx 各条的反向守卫里写死。
+#
+# 四元组：(取值路径, 显示名, 方向, 计数来源)
+# 计数来源为 (分子路径列表, 分母路径)。给出后判定会做**两比例 z 检验**：
+# 差异在当前样本量下与噪声不可区分时，判「不可判定」而不是「退化」。
+# 这解决的是同一个问题第三次触发 —— 低 N 指标上给出过于确定的结论（见 §11.3）。
 GATES = [
-    ("move_quality.Red.illegal_rate", "非法走步率(红)", "down"),
-    ("move_quality.Black.illegal_rate", "非法走步率(黑)", "down"),
-    ("move_quality.Red.fallback_rate", "正则兜底率(红)", "down"),
-    ("move_quality.Black.fallback_rate", "正则兜底率(黑)", "down"),
-    ("sides.Red.errors", "调用错误(红)", "down"),
-    ("sides.Black.errors", "调用错误(黑)", "down"),
+    ("move_quality.Red.illegal_rate", "非法走步率(红)", "down",
+     (["illegal", "parse_failures"], "decisions")),
+    ("move_quality.Black.illegal_rate", "非法走步率(黑)", "down",
+     (["illegal", "parse_failures"], "decisions")),
+    ("move_quality.Red.fallback_rate", "正则兜底率(红)", "down",
+     (["fallbacks"], "decisions")),
+    ("move_quality.Black.fallback_rate", "正则兜底率(黑)", "down",
+     (["fallbacks"], "decisions")),
+    ("sides.Red.errors", "调用错误(红)", "down", (["errors"], "llm_calls")),
+    ("sides.Black.errors", "调用错误(黑)", "down", (["errors"], "llm_calls")),
 ]
+
+# 差异小于该 p 值才算「可判定的变化」；否则一律判「不可判定」
+SIGNIFICANCE = 0.05
+
 # 仅记录不设门禁：成本与速度变化是取舍，不是回归
 INFO = [
     ("sides.Red.text_only_ratio", "工具调用占比(红)"),
@@ -66,11 +80,57 @@ def _dig(d, path):
     return cur
 
 
-def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
-    """把本次结果与基线逐项对比，并按门禁方向判定通过与否。
+def _counts(summary, path, spec):
+    """取出 (分子, 分母)。
 
-    基线里没有的指标一律显示 n/a 并判为「无法判定」——
-    把「没测过」显示成「通过」是这份工具最不该犯的错。
+    spec = (分子键列表, 分母键)。计数在**指标的父节点**里：
+    路径 `move_quality.Red.fallback_rate` 的计数在 `move_quality.Red` 下，
+    叶子本身只是比率，直接去 dig 叶子会拿到 float。
+    """
+    if not spec:
+        return None, None
+    nums, denom_key = spec
+    parts = path.split(".")
+    if len(parts) < 2:
+        return None, None
+    node = _dig(summary, ".".join(parts[:-1]))
+    if not isinstance(node, dict):
+        return None, None
+    if parts[-1] not in node:
+        return None, None          # 指标本身不存在，不能拿父节点的计数充当它
+    total = node.get(denom_key)
+    if total is None:
+        return None, None
+    num = sum(int(node.get(k) or 0) for k in nums)
+    return num, int(total)
+
+
+def two_proportion_p(x1, n1, x2, n2):
+    """两比例 z 检验的双侧 p 值（合并方差正态近似）。
+
+    样本极小时近似不可靠，此时返回 None，调用方按「无法判定」处理——
+    这正是我们要的行为：小样本下宁可说不知道。
+    """
+    if None in (x1, n1, x2, n2) or n1 <= 0 or n2 <= 0:
+        return None
+    if min(n1, n2) < 20:
+        return None                      # 样本太小，不做判定
+    p1, p2 = x1 / n1, x2 / n2
+    p = (x1 + x2) / (n1 + n2)
+    se = (p * (1 - p) * (1 / n1 + 1 / n2)) ** 0.5
+    if se == 0:
+        return None
+    z = abs(p1 - p2) / se
+    return math.erfc(z / math.sqrt(2))
+
+
+def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
+    """把本次结果与基线逐项对比，并按门禁方向判定。
+
+    两条不可退让的原则：
+      1. 基线里没有的指标判「无法判定」，绝不显示成「通过」；
+      2. 计数类指标先做显著性检验，**差异与噪声不可区分时判「不可判定」**，
+         而不是给一个「退化」——低 N 下「退化 1 次 / 分母 122」不是退化。
     """
     base = json.loads(Path(baseline_path).read_text(encoding="utf-8"))["summary"]
     cur = current["summary"]
@@ -80,35 +140,74 @@ def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
         current["meta"].get("label", "-"), current["meta"].get("commit"),
         current["meta"].get("thinking")))
     print()
-    print("%-22s %-10s %-10s %-10s %s" % ("指标", "基线", "本次", "Δ", "判定"))
+    print("%-20s %-13s %-13s %-9s %-6s %s"
+          % ("指标", "基线", "本次", "Δ", "p", "判定"))
 
     verdicts = []
-    rows = GATES + ([(path, label, "info") for path, label in INFO] if not gates_only else [])
-    for path, name, direction in rows:
+    inconclusive = []
+    rows = list(GATES) + ([(p, l, "info", None) for p, l in INFO] if not gates_only else [])
+    for row in rows:
+        path, name, direction = row[0], row[1], row[2]
+        spec = row[3] if len(row) > 3 else None
+
         if direction == "info":
             b, c = _dig(base, path), _dig(cur, path)
             delta = None if (b is None or c is None) else round(c - b, 3)
-            print("%-22s %-10s %-10s %-10s %s" % (
-                name, b, c, delta, "参考"))
+            print("%-20s %-13s %-13s %-9s %-6s %s"
+                  % (name, b, c, delta, "-", "参考"))
             continue
+
         b, c = _dig(base, path), _dig(cur, path)
         if b is None or c is None:
-            print("%-22s %-10s %-10s %-10s %s" % (name, b, c, "-", "无法判定"))
+            print("%-20s %-13s %-13s %-9s %-6s %s" % (name, b, c, "-", "-", "无法判定"))
             verdicts.append((name, False, "基线或本次缺该指标（多半是基线早于该指标存在）"))
             continue
+
+        bn, bd = _counts(base, path, spec)
+        cn, cd = _counts(cur, path, spec)
+        bs = "%s [%d/%d]" % (b, bn, bd) if None not in (bn, bd) else str(b)
+        cs = "%s [%d/%d]" % (c, cn, cd) if None not in (cn, cd) else str(c)
+        counts = "[%d/%d -> %d/%d]" % (bn, bd, cn, cd) if None not in (bn, bd, cn, cd) else ""
+
+        pv = two_proportion_p(bn, bd, cn, cd) if spec else None
+        if spec and pv is not None and pv >= SIGNIFICANCE:
+            # 差异与噪声不可区分 —— 不给「退化」，也不给「通过」
+            print("%-20s %-16s %-16s %-9s %-6s %s"
+                  % (name, bs, cs, round(c - b, 4), round(pv, 3), "不可判定"))
+            inconclusive.append((name, pv, counts.strip()))
+            continue
+
         delta = round(c - b, 4)
         ok = c <= b if direction == "down" else c >= b
-        print("%-22s %-10s %-10s %-10s %s" % (name, b, c, delta, "通过" if ok else "退化"))
-        if not ok:
-            verdicts.append((name, False, "%s %s -> %s" % (name, b, c)))
+
+        # 判定矩阵（别写错：显著退化必须失败，不能因为“有 spec”就放过）
+        if spec and pv is None:
+            verdict = "通过" if ok else "不可判定"
+            if not ok:
+                inconclusive.append((name, None, counts.strip()))
+        else:
+            verdict = "通过" if ok else "退化"
+            if not ok:
+                verdicts.append((name, False, "%s %s -> %s%s"
+                                 % (name, bs, cs, counts)))
+
+        print("%-20s %-16s %-16s %-9s %-6s %s"
+              % (name, bs, cs, delta,
+                 round(pv, 3) if pv is not None else "-", verdict))
 
     print()
+    if inconclusive:
+        print("以下指标的差异与噪声无法区分，**未做判定**（不是通过，也不是退化）：")
+        for name, p, counts in inconclusive:
+            ptxt = "p=%.3f" % p if p is not None else "样本不足"
+            print("  - %s：%s %s" % (name, ptxt, counts))
+        print()
     if verdicts:
         print("门禁未通过：")
         for name, _, why in verdicts:
             print("  - %s：%s" % (name, why))
         return 1
-    print("门禁全部通过（或对基线缺失的指标判为无法判定时需人工确认）")
+    print("门禁全部通过（另有上述「不可判定」项需人工确认）")
     return 0
 
 

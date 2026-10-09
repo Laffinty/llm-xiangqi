@@ -83,24 +83,6 @@ def test_missing_move_quality_reads_as_unmeasured_not_zero():
 
 # -------------------------------------------------------------------- compare
 
-def test_compare_flags_regression(capsys):
-    base_doc = report.build([_record()], {})
-    cur_doc = report.build([_record(move_quality={
-        "Red": {"decisions": 1, "legal": 0, "illegal": 1,
-                "parse_failures": 0, "illegal_rate": 1.0,
-                "contract_hits": 0, "fallbacks": 1, "fallback_rate": 1.0},
-        "Black": {"decisions": 1, "legal": 1, "illegal": 0,
-                  "parse_failures": 0, "illegal_rate": 0.0,
-                  "contract_hits": 1, "fallbacks": 0, "fallback_rate": 0.0}})], {})
-    import tempfile
-    from pathlib import Path
-    with tempfile.TemporaryDirectory() as d:
-        p = Path(d) / "base.json"
-        p.write_text(report.dumps(base_doc), encoding="utf-8")
-        rc = run_mod.cmd_compare(str(p), cur_doc, gates_only=True)
-    assert rc == 1, "非法走步率上升必须判为门禁未通过"
-
-
 def test_compare_passes_on_improvement(tmp_path):
     base_doc = report.build([_record(move_quality={
         "Red": {"decisions": 1, "legal": 0, "illegal": 1,
@@ -205,3 +187,98 @@ def test_wrapper_does_not_shadow_own_attributes():
     wrapper.model = "overridden"
     assert wrapper.model == "overridden", "包装层自身的属性不应被 __getattr__ 接管"
     assert wrapper.inner.model == "m"
+
+
+# ------------------------------------------------ 门禁的样本量判读
+
+
+def test_two_proportion_p_detects_real_difference():
+    from tests.eval.run import two_proportion_p
+    # 0/100 -> 10/100 是真差异，必须被识别
+    assert two_proportion_p(0, 100, 10, 100) < 0.05
+
+
+def test_two_proportion_p_admits_noise():
+    """1/123 -> 2/140 必须被判为噪声（这是三次误判的那个情形）。"""
+    from tests.eval.run import two_proportion_p
+    assert two_proportion_p(1, 123, 2, 140) > 0.05
+    assert two_proportion_p(6, 137, 7, 122) > 0.05
+
+
+def test_two_proportion_p_refuses_tiny_samples():
+    """样本太小时正态近似不可靠，应返回 None 而不是假 p 值。"""
+    from tests.eval.run import two_proportion_p
+    assert two_proportion_p(0, 5, 3, 5) is None
+    assert two_proportion_p(1, 10, 2, 10) is None
+
+
+
+def _full_record(n, illegal=0, fails=0, fb=0, errors=0):
+    """两侧都齐全的记录，避免任何指标因缺字段而落入「无法判定」。"""
+    mq = {}
+    st = {}
+    for side in ("Red", "Black"):
+        mq[side] = {"decisions": n, "legal": n - illegal - fails - fb,
+                    "illegal": illegal, "parse_failures": fails,
+                    "illegal_rate": (illegal + fails) / n,
+                    "contract_hits": n - fb, "fallbacks": fb,
+                    "fallback_rate": fb / n}
+        st[side] = {"llm_calls": n, "content_only_turns": 0, "text_only_ratio": 0.0,
+                    "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                    "errors": errors}
+    return {"stats": st, "move_quality": mq, "elapsed_sec": 1.0,
+            "turn_count": n, "category": "x", "aborted": None,
+            "result": "draw", "result_reason": "r"}
+
+
+def test_counts_are_read_from_parent_node():
+    """计数在父节点；叶子是比率。取叶子只会拿到 float。"""
+    from tests.eval.run import _counts
+    s = {"move_quality": {"Red": {"decisions": 140, "fallbacks": 2,
+                                  "illegal": 0, "parse_failures": 0,
+                                  "fallback_rate": 2 / 140,
+                                  "illegal_rate": 0.0}}}
+    assert _counts(s, "move_quality.Red.fallback_rate",
+                   (["fallbacks"], "decisions")) == (2, 140)
+    assert _counts(s, "move_quality.Red.illegal_rate",
+                   (["illegal", "parse_failures"], "decisions")) == (0, 140)
+    # 指标本身不存在时，必须返回 None 而不是拿父节点的计数充数
+    assert _counts(s, "move_quality.Red.nope",
+                   (["fallbacks"], "decisions")) == (None, None)
+
+
+def test_gate_fails_on_a_real_regression(tmp_path):
+    """0/400 -> 10/400 是真退化，门禁必须拦下。"""
+    from tests.eval import report, run as run_mod
+    base = report.build([_full_record(400)], {})
+    cur = report.build([_full_record(400, fb=10)], {})
+    p = tmp_path / "b.json"
+    p.write_text(report.dumps(base), encoding="utf-8")
+    assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 1, \
+        "10/400 的退化是真的，不能被当成噪声"
+
+
+def test_gate_reports_inconclusive_for_one_event(tmp_path):
+    """1/123 -> 2/140 是噪声，不得被判为「退化」。"""
+    from tests.eval import report, run as run_mod
+    base = report.build([_full_record(130, fb=1)], {})
+    cur = report.build([_full_record(140, fb=2)], {})
+    p = tmp_path / "b.json"
+    p.write_text(report.dumps(base), encoding="utf-8")
+    assert run_mod.cmd_compare(str(p), cur, gates_only=True) == 0, \
+        "1->2 的差异应判为不可判定，不应让门禁失败"
+
+
+def test_inconclusive_row_is_not_silently_passed(capsys):
+    """「不可判定」必须被显式输出，否则就是正好的「静默放行」。"""
+    from tests.eval import report, run as run_mod
+    import tempfile, pathlib
+    base = report.build([_full_record(130, fb=1)], {})
+    cur = report.build([_full_record(140, fb=2)], {})
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "b.json"
+        p.write_text(report.dumps(base), encoding="utf-8")
+        run_mod.cmd_compare(str(p), cur, gates_only=True)
+    out = capsys.readouterr().out
+    assert "不可判定" in out
+    assert "未做判定" in out
