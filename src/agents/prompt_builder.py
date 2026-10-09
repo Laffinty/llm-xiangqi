@@ -92,7 +92,9 @@ class PromptBuilder:
         # 纠错反馈并入下一条 user 消息，而不是单独追加一条（否则产生连续 user 消息）
         self.correction: Optional[str] = None
         self.current_user_turn: Optional[str] = None
-        self.tools: List[Dict[str, Any]] = list(MCP_TOOLS)
+        # 工具 schema 不再硬编码：以 ToolExecutor.get_tool_schemas() 为唯一事实来源
+        # （F-005 / F-006）。此处仅保留可注入的列表供测试使用。
+        self.tools: List[Dict[str, Any]] = []
 
     @classmethod
     def _load_default_prompt(cls) -> str:
@@ -503,60 +505,18 @@ class PromptBuilder:
 
 
     def get_tools(self) -> List[Dict[str, Any]]:
-        """获取工具定义"""
-        return self.tools
+        """获取工具定义。
+
+        未显式注入时从 `ToolExecutor.get_tool_schemas()` 实时取——
+        那里才是工具的唯一事实来源（W-06 目标）。
+        """
+        if self.tools:
+            return self.tools
+        from ..mcp_tools.tool_executor import ToolExecutor
+        return ToolExecutor.get_instance().get_tool_schemas()
 
     def set_tools(self, tools: List[Dict[str, Any]]) -> None:
-        """设置工具定义"""
+        """显式注入工具定义（测试用）。
+        不调用时 get_tools() 仍从 ToolExecutor 取。"""
         self.tools = tools
 
-
-# MCP工具定义
-MCP_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "evaluate_position",
-            "description": "调用Pikafish引擎评估当前局面，返回评分和最佳走步推荐",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fen": {"type": "string", "description": "当前局面FEN"},
-                    "depth": {
-                        "type": "integer",
-                        "description": "搜索深度(1-20)，越深越准确但越慢",
-                        "default": 15,
-                    },
-                },
-                "required": ["fen"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_opening_book",
-            "description": "查询开局库中当前局面的推荐走法",
-            "parameters": {
-                "type": "object",
-                "properties": {"fen": {"type": "string", "description": "当前局面FEN"}},
-                "required": ["fen"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "validate_and_explain",
-            "description": "验证走步并给出解释",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fen": {"type": "string", "description": "当前局面FEN"},
-                    "move": {"type": "string", "description": "要验证的ICCS走步"},
-                },
-                "required": ["fen", "move"],
-            },
-        },
-    },
-]

@@ -35,7 +35,6 @@ class ToolExecutor:
         self._tools: Dict[str, BaseTool] = {}
         self._tool_schemas: List[Dict[str, Any]] = []
         self._register_builtin_tools()
-        self._auto_discover_tools()
 
     @classmethod
     def get_instance(cls, config: Optional[Dict[str, Any]] = None) -> "ToolExecutor":
@@ -65,50 +64,12 @@ class ToolExecutor:
             )
         )
 
-    def _auto_discover_tools(self):
-        """自动发现外部工具"""
-        tools_dir = self.config.get("tools_dir")
-        if not tools_dir:
-            return
-
-        tools_path = Path(tools_dir)
-        if not tools_path.exists():
-            return
-
-        for py_file in tools_path.glob("**/*.py"):
-            if py_file.name.startswith("_"):
-                continue
-            self._load_tool_from_file(py_file)
-
-    def _load_tool_from_file(self, file_path: Path):
-        """从文件加载工具"""
-        try:
-            module_name = f"mcp_tools_external.{file_path.stem}"
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-
-                for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if (
-                        issubclass(obj, BaseTool)
-                        and obj is not BaseTool
-                        and not name.startswith("_")
-                    ):
-                        try:
-                            tool_instance = obj()  # type: ignore[call-arg]
-                            self.register_tool(tool_instance)
-                        except TypeError:
-                            logger.warning(
-                                f"Cannot instantiate tool {name}: missing required arguments"
-                            )
-                        except Exception as e:
-                            logger.warning(f"Failed to instantiate tool {name}: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to load tool from {file_path}: {e}")
-
     def register_tool(self, tool: BaseTool):
         """注册工具实例"""
+        # 重复名不重复注册，否则 schema 里会出现两份同名定义。
+        # 检查必须在赋值之前——放后面会永远命中自己。
+        if tool.name in self._tools:
+            return
         self._tools[tool.name] = tool
         self._tool_schemas.append(tool.get_schema())
 
@@ -180,4 +141,3 @@ class ToolExecutor:
         self._tools.clear()
         self._tool_schemas.clear()
         self._register_builtin_tools()
-        self._auto_discover_tools()

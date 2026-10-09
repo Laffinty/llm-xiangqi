@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from src.llm_adapters.base_adapter import LLMResponse, BaseLLMAdapter
 from src.llm_adapters.deepseek_adapter import DeepSeekAdapter
-from src.agents.prompt_builder import PromptBuilder, MCP_TOOLS
+from src.agents.prompt_builder import PromptBuilder
 from src.agents.base_agent import BaseAgent, AgentConfig, AgentResult, AgentStatus
 from src.core.referee_engine import RefereeEngine
 
@@ -59,17 +59,35 @@ class TestPromptBuilder:
 
 
 class TestMCPTools:
-    """测试MCP工具定义"""
+    """工具 schema 的唯一事实来源是 ToolExecutor，不是 prompt_builder 里的字面量"""
 
     def test_tools_defined(self):
-        """测试工具已定义"""
-        assert len(MCP_TOOLS) > 0
+        from src.mcp_tools.tool_executor import ToolExecutor
+        assert ToolExecutor.get_instance().get_tool_schemas()
 
     def test_evaluate_position_schema(self):
-        """测试evaluate_position工具schema"""
-        tool = next((t for t in MCP_TOOLS if t["function"]["name"] == "evaluate_position"), None)
+        from src.mcp_tools.tool_executor import ToolExecutor
+        schemas = ToolExecutor.get_instance().get_tool_schemas()
+        tool = next((t for t in schemas
+                     if t["function"]["name"] == "evaluate_position"), None)
         assert tool is not None
         assert "fen" in tool["function"]["parameters"]["properties"]
+
+    def test_prompt_builder_has_no_hardcoded_tool_literal(self):
+        """F-005/F-006：硬编码常量已删除，取工具必须走 ToolExecutor。"""
+        from src.agents.prompt_builder import PromptBuilder
+        assert not hasattr(__import__("src.agents.prompt_builder", fromlist=["x"]),
+                           "MCP_TOOLS")
+        names = [t["function"]["name"] for t in PromptBuilder("s").get_tools()]
+        assert "evaluate_position" in names
+
+    def test_duplicate_registration_does_not_duplicate_schema(self):
+        from src.mcp_tools.tool_executor import ToolExecutor
+        from src.mcp_tools.opening_book import OpeningBookTool
+        ex = ToolExecutor.get_instance()
+        before = len(ex.get_tool_schemas())
+        ex.register_tool(OpeningBookTool())
+        assert len(ex.get_tool_schemas()) == before
 
 
 class TestBaseAgent:
