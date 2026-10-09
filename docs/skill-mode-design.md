@@ -884,21 +884,58 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
 ---
 
 
-### W-04 BoardSnapshot 混合视图 —— `待做`
+### W-04 BoardSnapshot 混合视图 —— `待做`（设计已按契约形态重写）
 
-**依赖**：W-03
-**非目标**：**不删除 ASCII 盘**（`D-04`）。不重构 `RefereeEngine` 规则语义。
+**依赖**：W-03 已完成。**实施前置条件**：最终评测须确认黑方 `text_only_ratio`
+已从 0.99 降下来；若仍在 0.9 以上，说明 MiMo 在长对局上下文里同样漂移，
+本项应让位于「MiMo 长上下文服从度」问题。
 
-**改动面**：`src/agents/prompt_builder.py` 的 `_format_game_state` 追加结构化字段
+**非目标**：不删除 ASCII 盘（`D-04`）。不重构 `RefereeEngine` 规则语义。
 
-**验收命令**：
+#### 设计为什么改了
+
+原设计（`W-03` 之前）假设「模型仍从自由文本决策，只是多给了结构化字段」。
+`W-03` 落地后这个前提不成立：**决策入口已是 schema 契约**。
+于是「结构化字段给谁看」必须重答：
+
+| 决策路径 | 结构化字段的消费者 |
+|---|---|
+| 契约命中（DeepSeek / MiMo json_schema） | 生成 `thought` 与 `move` 的推理过程 |
+| 降级（自由文本正则） | 与现在相同，仍靠读 ASCII 盘 |
+
+所以本项**不是「在文本里多塞几个字段」**，而是决定：
+哪些结构化字段值得进入 prompt、哪些只是浪费 token（见 §6 成本模型）。
+
+#### 拟增字段（全部为**增量**，ASCII 盘与 FEN 原样保留）
+
+| 字段 | 用途 | 来源 |
+|---|---|---|
+| `phase` | 决定哪套 doctrine 生效（`W-05` 的前置） | 由 ply + 剩余子力推导 |
+| `material` | 子力差；模型常自己数错 | 引擎直接算 |
+| `in_check` / `check_side` | 明确是否被将军及被将方 | `is_king_in_check` |
+| `last_move_san` | 上一步的中文记谱，对应 `annotated_moves` 的标签体系 | 由 `last_move` + 标注推导 |
+| `repetition_warning` | 是否接近三次重复 | `position_history` |
+
+**明确不增的**：`legal_moves` 全量列表——它已作为 `enum` 写进契约 schema
+（`W-03`），在 prompt 里再列一遍是纯浪费。
+
+#### 验收
+
 ```
-python -m tests.eval.run --compare docs/eval-baseline.json --arm snapshot
+python -m pytest tests/ -q
+python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
+    --out docs/eval-after-w04.json --compare docs/eval-baseline.json
 ```
 
-**反向守卫**：胜率/和率不得低于基线。**这是 A/B，不是「应该更好」**——若不更好，回退本项，不强行保留。
+**反向守卫**：
+- 非法走步率 / 正则兜底占比**不得上升**
+- **每手 token 不得显著上升**——若 token 涨幅吃掉棋力收益，本项判失败
+  （结构化字段的价值必须能抵消它自己的成本）
+- 胜率/和率**不作为门禁**：N=7 在当前预算下胜负不可观测（见 `RK-07`），
+  拿它当门禁等于把噪声当信号
 
 ---
+
 
 ### W-05 知识 skill 拆分 —— `待做`
 
