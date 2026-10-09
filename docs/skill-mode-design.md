@@ -470,6 +470,39 @@ W-03 首次跑批时第 1 局以 `in_progress` + `Failed to get final move` 收�
 短 prompt 触发、完整对局 prompt 不触发。故 `required` 是「尽力而为」而非保证，
 降级路径必须常备。
 
+### F-026 两家的契约通道正好互补 —— `已核实`
+
+在**完整对局 prompt** 下实测（`W-03` 首轮门禁之后追加）：
+
+| provider | 工具调用 + 函数内 strict + `required` | `response_format: json_schema` |
+|---|---|---|
+| DeepSeek `deepseek-flash` | **OK** | 400（0/4） |
+| MiMo `mimo-v2.6-flash` | 会无视 required（完整 prompt 下 0.99 兜底） | **OK 4/4，走步全落 enum** |
+
+**两家各自只吃一条通道，且互斥。** 早先 `W-03` 首轮只用工具调用通道时，
+门禁虽然「全绿」，但收益几乎全来自 DeepSeek：红方 `text_only_ratio` 从 1.0 降到 0.07，
+黑方只从 1.00 降到 **0.99**。
+
+按通道分派后，生产路径 `think()` 实测 **8/8**，两家各走各的正确通道、走步全部合法：
+
+```
+deepseek  endgame_m14_p059  src=contract          move=e5e6  legal=True
+deepseek  in_check_p111     src=contract          move=e2c0  legal=True
+deepseek  opening_p13       src=contract          move=b6b9  legal=True
+deepseek  middlegame_p25    src=contract          move=b4e4  legal=True
+mimo      endgame_m14_p059  src=response_format  move=e5e6  legal=True
+mimo      in_check_p111     src=response_format  move=e0d0  legal=True
+mimo      opening_p13       src=response_format  move=b6b9  legal=True
+mimo      middlegame_p25    src=response_format  move=b4e4  legal=True
+```
+
+**两条通道投递的是同一份 schema**（`build_tool` 与 `build_response_format` 有断言保证），
+不是两套契约——分开维护必然分叉漂移。
+
+**教训**：「门禁全绿」不等于「改动有效」。`W-03` 首轮门禁 6 项全过，
+但其中 4 项的改善全部来自单一供应商；另一侧的 0.01 改善是 2 次失败变 1 次，
+在 N≈115 下不构成证据。**门禁需要按侧拆分才能看出这种不对称**。
+
 ## §2 裁决
 
 以下 `D-xx` 均为 `已裁决`。每条附**被否决的方案及否决理由**——这是为了避免后来者重新提出同一方案。
@@ -818,7 +851,7 @@ LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的�
 
 ---
 
-### W-03 结构化决策契约 —— `待做`
+### W-03 结构化决策契约 —— `完成`
 
 **依赖**：W-01 已完成；**另需先重采一次带 `move_quality` 的基线**（见 `F-022`）
 **非目标**：不实现 skill，不动 prompt doctrine。
@@ -842,8 +875,11 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
 **反向守卫**：非法走步率不得上升；`text_only_ratio` 不得上升；供应商不支持 strict 时
 必须走降级路径且降级路径有独立测试（`D-05` 约束）。
 
-**过程中被实测推翻的**：见 `F-025`。首版分支图缺「契约调用不合规」一格，
-跑批第一局即触发 `Failed to get final move`。
+**过程中被实测推翻的**：见 `F-025`（分支图缺一格）、`F-026`（单通道只对一家有效）。
+
+**门禁结果**（`docs/eval-after-w03.json`，2026-10-09）：6 项全部通过。
+非法走步率 红 0.025→0.0174、黑 0.0168→0.0088；正则兜底占比 红 **1.0→0.07**、黑 1.00→0.99。
+**但收益几乎全来自 DeepSeek 一侧**（见 `F-026`），因此追加了按通道分派的补强。
 
 ---
 
