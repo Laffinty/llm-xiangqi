@@ -81,7 +81,7 @@ def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
     print("%-22s %-10s %-10s %-10s %s" % ("指标", "基线", "本次", "Δ", "判定"))
 
     verdicts = []
-    rows = GATES + ([("__info__", n, "info") for n in INFO] if not gates_only else [])
+    rows = GATES + ([(path, label, "info") for path, label in INFO] if not gates_only else [])
     for path, name, direction in rows:
         if direction == "info":
             b, c = _dig(base, path), _dig(cur, path)
