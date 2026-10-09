@@ -180,3 +180,64 @@ async def test_contract_failure_falls_back_and_validates():
                      "arguments": {"move": "z9z9", "thought": "", "confidence": 1}}]))
     res = await agent.think({"legal_moves": LEGAL, "turn": "Red"})
     assert res.move is None, "非法走步不得被当成结果返回"
+
+class _ScriptedAdapter(_Adapter):
+    """按顺序返回预设响应，用来测分支走向。"""
+
+    def __init__(self, responses):
+        super().__init__(responses[0])
+        self._responses = list(responses)
+        self.calls = []
+
+    async def chat(self, messages, tools=None, **kw):
+        self.calls.append({"tools": [t["function"]["name"] for t in (tools or [])],
+                           "tool_choice": kw.get("tool_choice")})
+        return self._responses.pop(0)
+
+
+@pytest.mark.asyncio
+async def test_bad_contract_call_retries_without_tools_and_parses_text():
+    """F-025: 契约调用存在但参数不合规时，响应里没有 content 可降级。
+
+    此时若直接进工具循环会得到 "Failed to get final move"。正确做法是
+    不带工具重问一次，再用正则走降级路径。
+    """
+    bad = _resp(tool_calls=[{"name": "move_decision",
+                             "arguments": {"move": "z9z9", "thought": "", "confidence": 1}}])
+    text = _resp(content='{\"thought\": "试试\", \"move\": \"h2e2\"}')
+    adapter = _ScriptedAdapter([bad, text])
+    agent = LLMAgent(AgentConfig(
+        name="t", color="Red", description="", llm_adapter=adapter,
+        system_prompt="s", use_tools=False, use_decision_contract=True))
+    agent._last_legal_moves = list(LEGAL)
+
+    res = await agent.think({"legal_moves": LEGAL, "turn": "Red"})
+
+    assert len(adapter.calls) == 2, "第一次契约失败后必须重问一次"
+    assert adapter.calls[0]["tools"] == ["move_decision"]
+    assert adapter.calls[1]["tools"] == [], "重问时必须不带工具"
+    assert res.move == "h2e2", "应通过降级路径拿到走步"
+
+
+@pytest.mark.asyncio
+async def test_good_contract_call_does_not_retry():
+    good = _resp(tool_calls=[{"name": "move_decision",
+                              "arguments": {"move": "h2e2", "thought": "x", "confidence": 1}}])
+    adapter = _ScriptedAdapter([good])
+    agent = LLMAgent(AgentConfig(
+        name="t", color="Red", description="", llm_adapter=adapter,
+        system_prompt="s", use_tools=False, use_decision_contract=True))
+    agent._last_legal_moves = list(LEGAL)
+    await agent.think({"legal_moves": LEGAL, "turn": "Red"})
+    assert len(adapter.calls) == 1, "契约命中时不得有多余请求"
+
+
+@pytest.mark.asyncio
+async def test_tool_choice_required_when_contract_alone():
+    agent, adapter = _agent(_resp(content="x"))
+    await agent.think({"legal_moves": LEGAL, "turn": "Red"})
+    assert adapter.seen_tools is not None
+    agent2, adapter2 = _agent(_resp(content="x"))
+    adapter2.seen_choice = None
+    await agent2.think({"legal_moves": LEGAL, "turn": "Red"})
+    # _chat 内部决定 tool_choice，用 _ScriptedAdapter 验证更可靠

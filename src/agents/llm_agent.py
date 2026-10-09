@@ -44,13 +44,15 @@ class LLMAgent(BaseAgent):
     async def think(self, game_state: Dict[str, Any]) -> AgentResult:
         """思考走步
 
-        决策顺序（W-03）：
-          1. 先看是否走了决策契约（move_decision + strict enum）—— 命中即结束
-          2. 否则若有棋盘工具调用，走工具循环（W-01 的协议闭环）
-          3. 否则降级：从自由文本里正则提取并校验
+        分支判定顺序（W-03）：
+          1. 决策契约命中 -> 直接返回
+          2. 响应里有**棋盘能力**工具调用 -> 走工具循环（W-01 协议闭环）
+          3. 响应里只有 move_decision 但解析失败 -> 不动工具**重问一次**拿文本
+          4. 降级：从 content / thought 正则提取并校验
 
-        第 3 步是降级路径，不是主路径。它保留是因为 `tool_choice` 只能是 auto
-        （见 F-013），供应商**不保证**一定会调用工具。
+        第 3 步是被实测逼出来的：`tool_choice:"required"` 下模型仍可能给出
+        参数不合规的 move_decision。此时响应里没有 content 可降级，
+        直接进工具循环会得到 "Failed to get final move"（F-025）。
         """
         self.status = AgentStatus.THINKING
 
@@ -80,12 +82,21 @@ class LLMAgent(BaseAgent):
                                                   "confidence": decision["confidence"]}}],
                     )
 
-            # ---- 2. 棋盘工具循环（move_decision 不是棋盘工具，不进这里）----
-            if response.has_tool_calls():
+            # ---- 2. 棋盘能力工具调用 ----
+            board_calls = [tc for tc in (response.tool_calls or [])
+                           if tc.get("name") != decision_contract.DECISION_TOOL_NAME]
+            if board_calls:
                 tool_executor = self._get_tool_executor()
                 return await self.execute_tool_loop(response, tool_executor, game_state)
 
-            # ---- 3. 降级：自由文本正则 ----
+            # ---- 3. 契约调用存在但不合规 -> 无工具重问一次 ----
+            if response.has_tool_calls() and self.config.use_decision_contract:
+                self.last_response = response
+                retry = await self.config.llm_adapter.chat(messages, tools=None)
+                self.last_response = retry
+                response = retry
+
+            # ---- 4. 降级：自由文本正则 ----
             move = self._extract_move(response.content, legal_moves=legal_moves)
             if move is None and response.thought:
                 move = self._extract_move(response.thought, legal_moves=legal_moves)
