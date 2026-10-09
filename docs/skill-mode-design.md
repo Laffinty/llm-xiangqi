@@ -589,6 +589,37 @@ mimo      inner=True   wrapper=<absent>     <- 能力位丢了
 
 **门禁再次在 1 个事件上触发**：红方兜底 1 → 2（分母 123 → 140），同 `F-028`。
 
+### F-030 激活一致性实测 1.0；门禁按设计拒绝无该指标的基线 —— `已核实`
+
+方案 B 的首次跑批（`eval-after-w05b.json`，2026-10-09）：
+
+```
+激活一致性(红)   turns=118  matches=118  consistency=1.0
+激活一致性(黑)   turns=118  matches=118  consistency=1.0
+```
+
+**236 个回合，每一回合实际激活的 skill 都等于 `SkillRouter.resolve(snapshot)` 的结果。**
+即：快照 → 路由 → 拼装 → `active_skills` 这条运行时链**没有断**。
+
+这正是 `W-05` 第一步建激活断言的目的：它测的不是路由函数对不对（单测已守住），
+而是「规则正确但接线断了」——快照为 `None`、`current_user_turn` 过期、`reset()` 没清干净、
+`use_skills` 没传到——任何一种都会立刻表现为 consistency < 1。
+
+**门禁同时展示了另一条规则**：基线 `eval-after-w05.json` 采集于该指标存在之前，
+于是门禁判 **失败**（`激活一致性：基线或本次缺该指标`），尽管本次是完美的 1.0。
+
+这是刻意的：**无法评估的门禁不等于通过的门禁**（§11.3 判定矩阵最后一行）。
+`test_missing_metric_is_not_a_passed_gate` 守着这条。若让它放行，
+「门禁全部通过」会掩盖 8 项未评估。
+
+**处置**：`docs/eval-after-w05b.json` 即**方案 B 时代的基准**。
+后续评测与它比较，激活一致性才有意义。
+
+**其他数字**（与 `eval-after-w05` 相比）：兜底率红黑同为 0.0339（4/118），
+每手 token 2523.2（+50.9，激活埋点不影响 token），每局秒数 224.6（−39.5），
+7 局中 1 局 14 手被将死——**同一局面集内胜负仍大幅波动**，再次印证 `RK-07`。
+
+
 ## §2 裁决
 
 以下 `D-xx` 均为 `已裁决`。每条附**被否决的方案及否决理由**——这是为了避免后来者重新提出同一方案。
@@ -1107,6 +1138,31 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | Structured Outputs 背景与拒绝语义 | https://openai.com/index/introducing-structured-outputs-in-the-api/ |
 | MCP tools / resources 分工、`annotations`、`isError` 语义 | https://modelcontextprotocol.io/specification/2025-06-18/server/tools |
 | ReflAct（仓库 `base_agent.py:120` 引用的反思依据） | EMNLP 2025, arXiv:2505.15182 |
+### W-07 激活正确性门禁（方案 B 落地） —— `完成`
+
+**依赖**：W-05 第一步（激活断言）
+**非目标**：不引入真实棋力验收（那是方案 A，留作未选项）。
+
+**为什么单独立项**：`11.2` 裁决把验收标准从「胜率」改为「激活正确性 + 成本 + 合法率」，
+但**决策只写在散文里等于没有约束**。本项把它变成会红的门禁。
+
+**改动面**：
+- `tests/eval/runner.py` — `InstrumentedAgent` 逐回合记录
+  `expected = SkillRouter.resolve(snapshot)` 与 `actual = prompt_builder.active_skills`
+- `tests/eval/report.py` — 汇总 `activation.*.consistency`
+- `tests/eval/run.py` — 新增两项门禁，方向 `exact`（必须为 1.0），**不适用显著性检验**
+
+**关键设计**：`exact` 类门禁**不做**「不可判定」兜底——
+任一回合激活与局面不符就是接线断了，没有「样本太小」这回事。
+
+**验收结果**：见 `F-030`。红黑各 118/118 回合全部匹配，consistency 1.0。
+
+**附带验证**：基线 `eval-after-w05.json` 早于该指标，门禁因此判失败。
+这是 `test_missing_metric_is_not_a_passed_gate` 守着的规则在真实数据上的表现。
+
+---
+
+
 
 ---
 
@@ -1126,7 +1182,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | 知识按局面按需加载 | `F-029`：prompt/次 2770 → **2048（−26%）**，任何局面组合都省于原全量常驻 |
 | 工具来源收敛为单一事实源 | W-06：删掉 47 行硬编码 `MCP_TOOLS` 与 42 行动态发现死代码 |
 
-### 11.2 遗留项一：棋力在当前配置下不可观测 —— **开放**
+### 11.2 遗留项一：棋力在当前配置下不可观测 —— **已裁决（方案 B，2026-10-09）**
 
 7 局评测里 **0 局分出胜负**，开局与中局全部撞 40 手上限。
 
@@ -1141,7 +1197,11 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
   这三个指标在 N≈120 次决策下**可测**，且它们恰好是 skill 系统该保证的性质。
   `W-05` 第一步建立的激活断言就是为 B 准备的。
 
-**倾向 B**，因为 A 的成本与本轮迁移的收益不成比例。但这是需要用户拍板的取舍，不是技术选择。
+**已采纳 B**（用户 2026-10-09 确认）。验收标准正式改为「**激活正确性 + 成本 + 合法率**」，
+并在 `W-07` 中落成**可执行门禁**：激活一致性必须为 1.0。
+
+首次跑批见 `F-030`：红黑各 118/118 回合全部匹配，一致性 1.0。
+**方案 A 保留为未选项**，若将来需要真实棋力数据再启用。
 
 ### 11.3 遗留项二：门禁缺样本量判读 —— **已解决（2026-10-09）**
 
@@ -1180,7 +1240,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 结果 **10/400 这种真实退化也会被放过**。是新增的 `test_gate_fails_on_a_real_regression`
 把它逼出来的——**「不可判定」的兜底不能变成「默认通过」的另一张脸**。
 
-### 11.4 遗留项三：`W-04` 处于「未定」 —— **待定**
+### 11.4 遗留项三：`W-04` 处于「未定」 —— **可重评**
 
 `BoardSnapshot` 已实现并接入，**成本 +0.3%（每手 +9.9 token）**，非法走步率与
 兜底率均未恶化，但效果在当前 N 下不可判定。
@@ -1190,7 +1250,12 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 **未定的理由**：没有任何数据支持「它提升了质量」。
 
 这是一个**诚实的中立状态**，不是「通过」，也不是「失败」。
-若将来 11.2 选了方案 B（改用激活正确性验收），`W-04` 应重新用该标准评一次。
+**方案 B 已落地**（见 11.2 / `F-030`），`W-04` 现在**具备可重评的条件**：
+它输出的 `board_phase` 与 `repetition_warning` 正是激活一致性的输入，
+而激活一致性已实测 1.0 —— 这证明它**在运行时被正确计算并驱动了路由**。
+
+因此 `W-04` 的价值从「效果未测」转为「**作为路由输入已被验证有效**」。
+它是否进一步提升棋力，仍需方案 A 才能回答；那不再是本次迁移的收口条件。
 
 ### 11.5 交接给后来者
 
