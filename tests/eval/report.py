@@ -35,6 +35,30 @@ def classify(record: Dict) -> str:
     return "unknown"
 
 
+def _move_quality(records: List[Dict], side: str) -> Dict:
+    """汇总走步质量。
+
+    旧报告（schema@2 首版）没有 move_quality 字段，返回 None 值而非 0，
+    以免把「没测过」显示成「测出来是 0」。
+    """
+    present = [r for r in records if r.get("move_quality", {}).get(side)]
+    if not present:
+        return {"decisions": None, "illegal": None, "parse_failures": None,
+                "illegal_rate": None, "measured": False}
+    legal = sum(r["move_quality"][side]["legal"] for r in present)
+    illegal = sum(r["move_quality"][side]["illegal"] for r in present)
+    fails = sum(r["move_quality"][side]["parse_failures"] for r in present)
+    total = legal + illegal + fails
+    return {
+        "decisions": total,
+        "legal": legal,
+        "illegal": illegal,
+        "parse_failures": fails,
+        "illegal_rate": round((illegal + fails) / total, 4) if total else None,
+        "measured": True,
+    }
+
+
 def summarize(records: List[Dict]) -> Dict:
     """从原始记录计算汇总。纯函数：同样的 raw 必得同样的 summary。"""
     kinds = [classify(r) for r in records]
@@ -78,6 +102,8 @@ def summarize(records: List[Dict]) -> Dict:
             (sum(r["stats"][s]["total_tokens"] for r in records for s in ("Red", "Black"))
              / max(1, sum(r["turn_count"] for r in records))), 1),
         "sides": {"Red": side_totals("Red"), "Black": side_totals("Black")},
+        "move_quality": {"Red": _move_quality(records, "Red"),
+                         "Black": _move_quality(records, "Black")},
         "by_category": by_category,
         "result_reasons": sorted({r.get("result_reason") or "" for r in records}),
     }
@@ -97,6 +123,9 @@ def _warnings(s: Dict) -> List[str]:
     if s["sides"]["Red"]["text_only_ratio"] == 1.0 and s["sides"]["Black"]["text_only_ratio"] == 1.0:
         w.append("双方 text_only_ratio 均为 1.0：从未发生工具调用，"
                  "全部走步经由正则从自由文本提取（use_tools=false）。")
+    if not s["move_quality"]["Red"]["measured"]:
+        w.append("本批未采集 move_quality（非法走步率）：该指标在这份报告采集时尚不存在，"
+                 "不能与后续报告比较，需重新采集基线。")
     return w
 
 

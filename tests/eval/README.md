@@ -29,6 +29,10 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
 
 # 4. 复验报告自洽性
 python -m tests.eval.run --verify docs/eval-baseline.json
+
+# 5. 跑局后与基线对比（门禁）
+python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
+    --out docs/eval-after-w03.json --compare docs/eval-baseline.json
 ```
 
 常用开关：`--both-sides`（正反两个方向）、`--only-category endgame in_check`、
@@ -82,3 +86,20 @@ python -m tests.eval.run --verify docs/eval-baseline.json
 首轮实跑发现：当前 `max_tokens: 2048` 会被思维链吃光，模型**从未写出答案**，
 走步全靠从截断的思考文本里正则刨。详见 `docs/skill-mode-design.md` 事实 `F-017`
 与工作项 `W-00`。基线采集应在 `W-00` 之后进行，否则 before 本身是坏的。
+## 门禁（`--compare`）
+
+`--compare` 会跑局后逐项对比基线，按固定方向判定。方向写死在 `run.py:GATES`，
+不要在调用处临时改。
+
+| 指标 | 方向 | 含义 |
+|---|---|---|
+| `move_quality.*.illegal_rate` | 不得上升 | 非法走步 + 解析失败占比 |
+| `sides.*.text_only_ratio` | 不得上升 | 走正则兜底路径的回合占比 |
+| `sides.*.errors` | 不得上升 | 调用错误数 |
+
+代销与速度只展示不能门禁——它们是取舍，不是回归。
+
+**基线缺某个指标时，门禁判为「无法判定」并令退出码为 1**——
+不会把「没测过」显示成「通过」。这是这个工具最不应该犯的错。
+
+另：报告格式演进后旧报告可用 `--restate` 重算，无需重跑对局。

@@ -38,6 +38,78 @@ def _diff_mode(extra_args) -> bool:
         return False
 
 
+# 门禁：这些指标**不允许变差**。方向已在 W-xx 各条的反向守卫里写死。
+GATES = [
+    ("move_quality.Red.illegal_rate", "非法走步率(红)", "down"),
+    ("move_quality.Black.illegal_rate", "非法走步率(黑)", "down"),
+    ("sides.Red.text_only_ratio", "正则兜底占比(红)", "down"),
+    ("sides.Black.text_only_ratio", "正则兜底占比(黑)", "down"),
+    ("sides.Red.errors", "调用错误(红)", "down"),
+    ("sides.Black.errors", "调用错误(黑)", "down"),
+]
+# 仅记录不设门禁：成本与速度变化是取舍，不是回归
+INFO = [
+    ("mean_tokens_per_turn", "每手 token"),
+    ("mean_elapsed_sec", "每局秒数"),
+    ("mean_ply", "平均 ply"),
+]
+
+
+def _dig(d, path):
+    cur = d
+    for k in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def cmd_compare(baseline_path: str, current, gates_only: bool = False) -> int:
+    """把本次结果与基线逐项对比，并按门禁方向判定通过与否。
+
+    基线里没有的指标一律显示 n/a 并判为「无法判定」——
+    把「没测过」显示成「通过」是这份工具最不该犯的错。
+    """
+    base = json.loads(Path(baseline_path).read_text(encoding="utf-8"))["summary"]
+    cur = current["summary"]
+
+    print("基线: %s" % baseline_path)
+    print("本次: %s  commit=%s  thinking=%s" % (
+        current["meta"].get("label", "-"), current["meta"].get("commit"),
+        current["meta"].get("thinking")))
+    print()
+    print("%-22s %-10s %-10s %-10s %s" % ("指标", "基线", "本次", "Δ", "判定"))
+
+    verdicts = []
+    rows = GATES + ([("__info__", n, "info") for n in INFO] if not gates_only else [])
+    for path, name, direction in rows:
+        if direction == "info":
+            b, c = _dig(base, path), _dig(cur, path)
+            delta = None if (b is None or c is None) else round(c - b, 3)
+            print("%-22s %-10s %-10s %-10s %s" % (
+                name, b, c, delta, "参考"))
+            continue
+        b, c = _dig(base, path), _dig(cur, path)
+        if b is None or c is None:
+            print("%-22s %-10s %-10s %-10s %s" % (name, b, c, "-", "无法判定"))
+            verdicts.append((name, False, "基线或本次缺该指标（多半是基线早于该指标存在）"))
+            continue
+        delta = round(c - b, 4)
+        ok = c <= b if direction == "down" else c >= b
+        print("%-22s %-10s %-10s %-10s %s" % (name, b, c, delta, "通过" if ok else "退化"))
+        if not ok:
+            verdicts.append((name, False, "%s %s -> %s" % (name, b, c)))
+
+    print()
+    if verdicts:
+        print("门禁未通过：")
+        for name, _, why in verdicts:
+            print("  - %s：%s" % (name, why))
+        return 1
+    print("门禁全部通过（或对基线缺失的指标判为无法判定时需人工确认）")
+    return 0
+
+
 def cmd_verify(path: str) -> int:
     data = Path(path).read_text(encoding="utf-8")
     loaded = json.loads(data)
@@ -138,7 +210,7 @@ async def cmd_run(args) -> int:
     out.write_text(report.dumps(doc), encoding="utf-8")
     print("\n-> %s" % out)
     print(json.dumps(doc["summary"], ensure_ascii=False, indent=2))
-    return 0
+    return doc
 
 
 def main(argv=None) -> int:
@@ -155,6 +227,10 @@ def main(argv=None) -> int:
                     default=None, choices=[True, False],
                     help="覆盖 thinking 开关（默认沿用 config）。用于 A/B："
                          "--thinking true / --thinking false")
+    ap.add_argument("--compare", metavar="BASELINE", default=None,
+                    help="跑局后与基线逐项对比并按门禁方向判定")
+    ap.add_argument("--gates-only", action="store_true",
+                    help="--compare 时只显示门禁项，不显示成本参考项")
     ap.add_argument("--verify", metavar="PATH", default=None)
     ap.add_argument("--restate", metavar="PATH", default=None,
                     help="用既有 raw 重算报告（不联网、不重跑对局）。"
@@ -178,7 +254,14 @@ def main(argv=None) -> int:
             return cmd_restate(args.restate, args.restate_note)
         if args.probe:
             return cmd_probe(args.api_file)
-        return asyncio.run(cmd_run(args))
+        doc = asyncio.run(cmd_run(args))
+        if args.compare:
+            doc["meta"]["label"] = args.out
+            print()
+            print("=" * 70)
+            print("\u4e0e\u57fa\u7ebf\u5bf9\u6bd4")
+            return cmd_compare(args.compare, doc, gates_only=args.gates_only)
+        return 0
     except (providers.KeyConflict, providers.MissingKey) as e:
         # 这些是「配置不对」，不是「程序坏了」——打清晰信息，不抛栈
         print("\n%s\n" % e, file=sys.stderr)

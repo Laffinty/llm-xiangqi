@@ -364,6 +364,31 @@ MiMo `mimo-v2.6-flash`：本次采样未触发工具调用，该格无数据（�
 
 单测当时全绿——因为它们验证的是我写下的形状，而不是供应商的规则。
 
+### F-022 现有基线早于非法走步率指标，W-03 的主门禁暂不可判定 —— `已核实`
+
+W-01 收尾时补了 harness 的 `--compare`（此前计划里写了验收命令，工具却没实现）。
+为此新增 `move_quality` 指标：`legal` / `illegal` / `parse_failures` / `illegal_rate`，
+由 `runner.InstrumentedAgent` 包在 `think()` 外层统计。
+
+把现有基线 `--restate` 后自己跟自己比，结果是：
+
+```
+非法走步率(红)      None    None    -     无法判定
+非法走步率(黑)      None    None    -     无法判定
+正则兜底占比(红)     1.0     1.0     0.0   通过
+调用错误(红)        0       0       0     通过
+
+门禁未通过：
+  - 非法走步率(红)：基线或本次缺该指标（多半是基线早于该指标存在）
+exit: 1
+```
+
+**结论：`docs/eval-baseline.json` 采集于 `move_quality` 存在之前，主门禁无法与它比较。**
+工具的行为是对的——缺指标时判「无法判定」并退出 1，而不是悄悄放行。
+
+**代价**：W-03 之前必须**重新采集一次带 `move_quality` 的基线**（约 40-90 分钟）。
+基线日志里能看到 9 次 `_extract_move` 解析失败，说明这个指标确实会动，不是摆设。
+
 ## §2 裁决
 
 以下 `D-xx` 均为 `已裁决`。每条附**被否决的方案及否决理由**——这是为了避免后来者重新提出同一方案。
@@ -674,9 +699,9 @@ strict 模式的三条硬性要求（OpenAI 明确规定，否则请求被拒）
 **过程中被实测推翻的**：单测全绿并不能证明协议正确。`build_messages` 的消息顺序
 与 `current_user_turn` 缺失两个 bug 都是靠真实请求暴露的，不是靠单测。
 
-**未做**：计划里写的 `python -m tests.eval.run --compare docs/eval-baseline.json`
-**尚未实现**——harness 目前只有 `--verify`（自洽性）与 `--restate`（重算），
-没有「与基线比 delta」。W-03 的门禁依赖它，需先补。
+**后续**：计划里写的 `--compare` 当时尚未实现，已补齐（见 `F-022`），
+并新增 `tests/test_eval_harness.py`（12 条）——此前 `tests/` **从未导入过 harness 模块**，
+harness 里的错误要靠手动跑 CLI 才会暴露。
 
 
 ### W-02 对局评测基线 —— `完成`
@@ -713,26 +738,30 @@ LLM 采样本身不确定，要求两次 live 跑出同样字节是不成立的�
 
 ### W-03 结构化决策契约 —— `待做`
 
-**依赖**：W-01
+**依赖**：W-01 已完成；**另需先重采一次带 `move_quality` 的基线**（见 `F-022`）
 **非目标**：不实现 skill，不动 prompt doctrine。
 
-**改动面**：`src/agents/` 新增 schema 模块；`base_agent.py` 的 `_extract_move` 改为 schema 校验优先
+**前置条件（硬性）**：现有 `docs/eval-baseline.json` 不含 `move_quality`，
+本项的主门禁「非法走步率不得高于基线」**对它无法判定**。
+必须先重采一份基线（约 40-90 分钟），否则本项只能靠人肉读数。
+
+**做法**：用实测可行的单一工具调用 `move_decision`，`strict: true` 放在函数定义内，
+`tool_choice: "auto"`（绝不用 `required`，见 `F-013`）。合法走法作为 `enum` 写入。
+
+**改动面**：`src/agents/` 新增 schema 模块；`_extract_move` 降级为兜底而非主路径
 
 **验收命令**：
 ```
-python -m pytest tests/test_agents.py -q
-python -m tests.eval.run --compare docs/eval-baseline.json
+python -m pytest tests/ -q
+python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
+    --out docs/eval-after-w03.json --compare <新基线>
 ```
 
-**反向守卫**：非法走步率必须**不高于**基线。
-降级路径必须有独立测试覆盖（`D-05` 约束）。
-
-**已实测需额外防御的三个地雷**（均已实测，实现时不得违反）：
-- 禁止将 `strict` 放入 `response_format`（DeepSeek 400）
-- 禁止使用 `tool_choice: "required"`（DeepSeek 400）
-- 多轮工具调用必须回送 `reasoning_content`（两家都是 thinking model）
+**反向守卫**：非法走步率不得上升；`text_only_ratio` 不得上升；供应商不支持 strict 时
+必须走降级路径且降级路径有独立测试（`D-05` 约束）。
 
 ---
+
 
 ### W-04 BoardSnapshot 混合视图 —— `待做`
 
@@ -812,7 +841,7 @@ python -m tests.eval.run --compare docs/eval-baseline.json --arm skills
 | `W-05` 知识 skill | `待做` | — | — |
 | `W-06` 动作 skill | `待做` | — | — |
 
-**执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → **补 `--compare`** → `W-03` → `W-04` → `W-05` → `W-06`。
+**执行顺序**：`W-00` → `W-02`（基线）→ `W-01` → **重采含 move_quality 的基线** → `W-03` → `W-04` → `W-05` → `W-06`。
 
 `W-00` 是后补的（harness 建好后第一件事就是发现了它）：它是在 `W-02` 的实跑中才暴露的（F-017）。harness 建好后第一件事
 就是发现了它——这本身就是「先建度量」这条裁决（D-08）的收益证明。

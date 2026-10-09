@@ -6,7 +6,7 @@ AgentConfig / LLMAgent / LLMAgentGameController，然后观察结果。
 """
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.core.referee_engine import RefereeEngine
 from src.core.game_controller import LLMAgentGameController
@@ -50,6 +50,51 @@ def build_agent(slot: int, adapter, color: str, name: str, temperature: float) -
     return LLMAgent(agent_cfg)
 
 
+class InstrumentedAgent:
+    """透明包装 Agent，只统计「走步质量」。
+
+    这是 W-03 门禁「非法走步率不得高于基线」需要的指标，此前从未被测过——
+    基线报告里没有它，这不是遗漏，是当时还不存在。
+    """
+
+    def __init__(self, agent, color: str):
+        self._agent = agent
+        self.config = agent.config          # 控制器会读 config.name / config.color
+        self.color = color
+        self.legal_moves = 0
+        self.illegal_moves = 0
+        self.parse_failures = 0
+
+    async def think(self, game_state: Dict[str, Any]):
+        result = await self._agent.think(game_state)
+        legal = set(game_state.get("legal_moves") or [])
+        move = getattr(result, "move", None)
+        if move is None or move == "jxjx":
+            self.parse_failures += 1
+        elif move in legal:
+            self.legal_moves += 1
+        else:
+            self.illegal_moves += 1
+        return result
+
+    def add_correction_feedback(self, *a, **kw):
+        return self._agent.add_correction_feedback(*a, **kw)
+
+    def reset(self):
+        return self._agent.reset()
+
+    def move_quality(self) -> Dict:
+        total = self.legal_moves + self.illegal_moves + self.parse_failures
+        return {
+            "decisions": total,
+            "legal": self.legal_moves,
+            "illegal": self.illegal_moves,
+            "parse_failures": self.parse_failures,
+            "illegal_rate": round(
+                (self.illegal_moves + self.parse_failures) / total, 4) if total else None,
+        }
+
+
 async def play_case(
     case,
     red_provider: str,
@@ -69,8 +114,8 @@ async def play_case(
     black_adapter = providers.InstrumentedAdapter(
         providers.build_adapter(black_provider, keys[black_provider], thinking=thinking))
 
-    red = build_agent(1, red_adapter, "Red", "EvalRed", temperature)
-    black = build_agent(2, black_adapter, "Black", "EvalBlack", temperature)
+    red = InstrumentedAgent(build_agent(1, red_adapter, "Red", "EvalRed", temperature), "Red")
+    black = InstrumentedAgent(build_agent(2, black_adapter, "Black", "EvalBlack", temperature), "Black")
 
     engine = RefereeEngine(case.fen)
     controller = LLMAgentGameController(
@@ -105,6 +150,7 @@ async def play_case(
         "move_history": history,
         "elapsed_sec": round(elapsed, 2),
         "stats": {"Red": red_adapter.stats(), "Black": black_adapter.stats()},
+        "move_quality": {"Red": red.move_quality(), "Black": black.move_quality()},
     }
 
 
