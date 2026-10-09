@@ -61,7 +61,8 @@ class PromptBuilder:
         '必须输出JSON格式: {"thought": "你的分析", "move": "h2e2"}'
     )
 
-    def __init__(self, system_prompt: Optional[str] = None):
+    def __init__(self, system_prompt: Optional[str] = None,
+                 use_skills: bool = False):
         """
         初始化PromptBuilder
 
@@ -81,6 +82,10 @@ class PromptBuilder:
             )
 
         self.system_prompt = system_prompt
+        # W-05：启用后 system prompt 由 base.md + manifest + 激活正文组装
+        self.use_skills = use_skills
+        # 本回合激活的 skill 名，供 harness 断言用
+        self.active_skills: List[str] = []
         self.history: List[Dict[str, str]] = []
         self.tool_exchanges: List[Dict[str, Any]] = []
         self.assistant_notes: List[str] = []
@@ -156,6 +161,13 @@ class PromptBuilder:
             )
 
         # 构建用户消息
+        if self.use_skills:
+            from ..skills.activator import compose
+            composed, self.active_skills = compose(
+                snapshot=game_state.get("snapshot"), player_color=player_color)
+            system_prompt = composed
+            self.system_prompt = composed
+
         user_content = self._format_game_state(game_state)
         # 记住本轮：否则 _continue_chat 重建消息时会丢掉它，对话以 assistant 开头（非法）。
         self.current_user_turn = user_content

@@ -147,24 +147,33 @@ def test_each_skill_description_is_concise():
 
 # ------------------------------------------------------------------ 内容
 
-def test_bodies_not_yet_migrated_are_declared():
-    """占位正文必须自述「未迁移」，不能让人误以为 doctrine 已经搬过来了。"""
+def test_bodies_are_migrated():
+    """W-05 第二步后，SKILL.md 正文必须是真 doctrine，不能还停在占位符。"""
     reg = load_skills()
     for name, spec in sorted(reg.skills.items()):
         body = spec.path.read_text(encoding="utf-8")
-        assert "\u6b63\u6587\u5c1a\u672a\u8fc1\u79fb" in body, "%s 未声明正文未迁移" % name
+        assert "正文尚未迁移" not in body, "%s 仍是占位正文" % name
+        assert len(body) > 200, "%s 正文过短，疑似未真正迁移" % name
 
+def test_migration_is_cheaper_than_always_on_prompt():
+    """W-05 的全部价值：拆分后的常驻开销必须低于原全量常驻。
 
-def test_original_prompt_is_untouched():
-    """W-05 第一步不动 doctrine 来源。
-
-    断言用语义而非体积：三个阶段的 doctrine 都还在 agent_default.txt 里，
-    就说明内容迁移尚未发生。
+    否则拆分只是形式变化，不是测量改善。
     """
     from pathlib import Path
-    text = Path("prompts/agent_default.txt").read_text(encoding="utf-8")
-    for marker in ("开局阶段", "中局阶段", "残局阶段"):
-        assert marker in text, "%s 仍在 agent_default.txt，说明 doctrine 未被迁移" % marker
+    from src.skills.activator import compose
+
+    old = Path("prompts/agent_default.txt").read_text(encoding="utf-8")
+    worst = None
+    for phase in ("opening", "middlegame", "endgame"):
+        for check in (False, True):
+            for rep in (False, True):
+                snap = {"board_phase": phase, "in_check": check,
+                       "repetition_warning": rep}
+                text, active = compose(snap, player_color="Red")
+                if len(text) > len(old):
+                    worst = (phase, check, rep, len(text), active)
+    assert worst is None, "存在比原全量常驻更贵的组合: %s" % (worst,)
 
 
 def test_missing_skill_dir_is_not_an_error():
@@ -180,3 +189,39 @@ def test_dir_name_must_match_skill_name(tmp_path):
         encoding="utf-8")
     with pytest.raises(SkillSpecError):
         load_skills(tmp_path)
+def test_activator_returns_activated_names():
+    """组装函数必须回报激活名单，否则 harness 无法断言「激活了什么」。"""
+    from src.skills.activator import compose
+    text, active = compose(
+        {"board_phase": "endgame", "in_check": True, "repetition_warning": False})
+    assert active == ["check-defense", "endgame-technique"]
+    assert "残局要领" in text, "激活的 skill 正文应出现在 prompt 里"
+    assert "开局要领" not in text, "未激活的 skill 正文不应出现"
+
+
+def test_composed_prompt_has_no_placeholder_leftover():
+    from src.skills.activator import compose
+    text, _ = compose({"board_phase": "opening"}, player_color="Black")
+    assert "{PLAYER_COLOR}" not in text
+    assert "Black" in text
+
+
+def test_prompt_builder_composes_when_enabled():
+    """端到端：开关打开时 build_game_prompt 用的是组装后的 prompt。"""
+    from src.agents.prompt_builder import PromptBuilder
+    from src.core.referee_engine import RefereeEngine
+    from src.core.state_serializer import GameState, GamePhase, GameResult
+
+    e = RefereeEngine("2b1k4/4a4/b4P3/9/9/9/9/B2K4p/9/5A3 w - - 0 1")
+    d = GameState.from_engine(e, phase=GamePhase.RED_TO_MOVE,
+                              result=GameResult.IN_PROGRESS).to_dict()
+
+    on = PromptBuilder("legacy", use_skills=True)
+    msg_on = on.build_game_prompt(d, player_color="Red")
+    assert on.active_skills == ["endgame-technique"]
+    assert "残局要领" in msg_on[0]["content"]
+
+    off = PromptBuilder("legacy", use_skills=False)
+    msg_off = off.build_game_prompt(d, player_color="Red")
+    assert off.active_skills == []
+    assert msg_off[0]["content"] == "legacy"

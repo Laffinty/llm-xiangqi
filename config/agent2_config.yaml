@@ -11,6 +11,9 @@ agent:
   # W-03 决策契约：合法走步以 enum 写入 strict schema，
   # 使模型物理上无法输出非法走步。见 docs/skill-mode-design.md D-05 / F-012 / F-013。
   decision_contract: true
+  # W-05：启用后 system prompt 由 base.md + skill manifest + 按局面激活的正文组装，
+  # 替代 agent_default.txt 的全量常驻。任何一个局面组合都比原常驻省 token（最多 -41%）。
+  skills: true
 
 llm:
   provider: "mimo"

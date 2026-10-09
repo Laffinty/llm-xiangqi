@@ -74,6 +74,9 @@ class AgentConfig:
     # W-03 决策契约：合法走步以 enum 写入 schema。
     # 默认关闭 —— 开启会改变行为，必须显式开启。
     use_decision_contract: bool = False
+    # W-05：启用后 system prompt 由 base.md + skill manifest + 激活正文组装，
+    # 而不是 agent_default.txt 全量常驻。默认关：未迁移时保持旧行为。
+    use_skills: bool = False
 
 
 @dataclass
@@ -92,7 +95,8 @@ class BaseAgent(ABC):
 
     def __init__(self, config: AgentConfig):
         self.config = config
-        self.prompt_builder = PromptBuilder(config.system_prompt)
+        self.prompt_builder = PromptBuilder(config.system_prompt,
+                                           use_skills=getattr(config, "use_skills", False))
         self.status = AgentStatus.IDLE
         self.last_response: Optional[LLMResponse] = None
         # 本回合的合法走步：续生成时仍需它构造决策契约的 enum

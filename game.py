@@ -93,6 +93,7 @@ def _load_agent(config_file: str) -> LLMAgent:
         use_tools=agent_data.get("use_tools", False),
         use_reflection=agent_data.get("use_reflection", False),
         use_decision_contract=bool(agent_data.get("decision_contract", False)),
+        use_skills=bool(agent_data.get("skills", False)),
     )
 
     return LLMAgent(agent_cfg)
