@@ -325,10 +325,52 @@ class PromptBuilder:
             lines.append("## 走棋历史")
             lines.append(" ".join(game_history))
 
+        lines.extend(self._format_snapshot(state.get("snapshot")))
+
         lines.append("")
         lines.append("请根据以上局面，选择一个最优的合法走步。")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_snapshot(snap) -> List[str]:
+        """结构化局面摘要（W-04）。
+
+        严格控制长度：这些字段每轮都进 prompt，占的是真钱。
+        每行一句，不重复 ASCII 盘已有的信息，不重复列出 legal_moves（那部分
+        已作为 enum 写在契约 schema 里）。
+        """
+        if not snap:
+            return []
+
+        out = ["", "## 局面摘要"]
+
+        phase = {"opening": "开局", "middlegame": "中局",
+                 "endgame": "残局"}.get(snap.get("board_phase"), snap.get("board_phase"))
+        out.append("- 阶段: %s" % phase)
+
+        mat = snap.get("material") or {}
+        if mat:
+            out.append("- 子力: 红%d 黑%d（以当前走子方视角差 %+d）" % (
+                mat.get("Red", 0), mat.get("Black", 0),
+                mat.get("diff_for_side_to_move", 0)))
+
+        if snap.get("in_check"):
+            out.append("- 将军: 是（%s方被将）" % snap.get("check_side"))
+
+        detail = snap.get("last_move_detail")
+        if detail and detail.get("piece"):
+            bits = ["- 上一步: %s %s→%s" % (detail["piece"], detail["from"], detail["to"])]
+            if detail.get("captured"):
+                bits.append("吃%s" % detail["captured"])
+            if detail.get("gives_check"):
+                bits.append("将军")
+            out.append("".join(bits))
+
+        if snap.get("repetition_warning"):
+            out.append("- 重复警告: 是（局面已出现多次，避免循环）")
+
+        return out
 
     def build_validation_prompt(
         self, game_state: GameStateDict

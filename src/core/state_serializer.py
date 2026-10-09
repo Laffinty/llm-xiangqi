@@ -5,7 +5,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TypedDict
 from enum import Enum
 
 
@@ -23,6 +23,16 @@ class GameResult(Enum):
     BLACK_WIN = "black_win"
     DRAW = "draw"
     IN_PROGRESS = "in_progress"
+
+
+class BoardSnapshotDict(TypedDict, total=False):
+    """BoardSnapshot 结构化局面字段（W-04）"""
+    board_phase: str
+    material: Dict[str, Any]
+    in_check: bool
+    check_side: Optional[str]
+    last_move_detail: Optional[Dict[str, Any]]
+    repetition_warning: bool
 
 
 @dataclass
@@ -43,6 +53,8 @@ class GameState:
     phase: GamePhase = GamePhase.NOT_STARTED
     result: GameResult = GameResult.IN_PROGRESS
     result_reason: Optional[str] = None
+    # W-04：结构化局面字段。空旦异常，不阻断对局。
+    snapshot: Optional[BoardSnapshotDict] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -58,7 +70,8 @@ class GameState:
             "last_move_by": self.last_move_by,
             "phase": self.phase.value,
             "result": self.result.value,
-            "result_reason": self.result_reason
+            "result_reason": self.result_reason,
+            "snapshot": self.snapshot,
         }
 
     @classmethod
@@ -86,6 +99,13 @@ class GameState:
         """
         annotated_moves = engine.get_annotated_moves()
         move_history = engine.move_history
+        snapshot = None
+        try:
+            from .board_snapshot import build as _build_snapshot
+            snapshot = _build_snapshot(engine)
+        except Exception:
+            # 结构化字段是增量：它不能阻断对局。
+            snapshot = None
         return cls(
             turn=engine.get_current_turn(),
             fen=engine.current_fen,
@@ -99,6 +119,7 @@ class GameState:
             phase=phase,
             result=result,
             result_reason=result_reason,
+            snapshot=snapshot,
         )
 
 
