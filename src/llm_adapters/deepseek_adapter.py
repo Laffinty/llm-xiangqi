@@ -10,6 +10,9 @@ from .openai_base_adapter import OpenAICompatibleAdapter
 
 
 class DeepSeekAdapter(OpenAICompatibleAdapter):
+    # 实测：该供应商拒绝 response_format: json_schema（F-012）。
+    supports_response_format_json_schema = False
+
     """DeepSeek LLM适配器
 
     API格式:

@@ -10,6 +10,10 @@ from .openai_base_adapter import OpenAICompatibleAdapter
 
 
 class MiMoAdapter(OpenAICompatibleAdapter):
+    # 实测：该供应商支持 response_format: json_schema + strict，且在完整对局
+    # prompt 下优先于 tool_choice=required（它会忽视 required，F-025）。
+    supports_response_format_json_schema = True
+
     """MiMo LLM适配器
 
     API格式:

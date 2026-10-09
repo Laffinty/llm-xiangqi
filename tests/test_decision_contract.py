@@ -241,3 +241,80 @@ async def test_tool_choice_required_when_contract_alone():
     adapter2.seen_choice = None
     await agent2.think({"legal_moves": LEGAL, "turn": "Red"})
     # _chat 内部决定 tool_choice，用 _ScriptedAdapter 验证更可靠
+
+
+# ------------------------------------------------ 两条契约通道的一致性
+
+
+def test_both_channels_share_the_same_schema():
+    """工具调用与 response_format 是同一套 schema 的两种投递方式。
+
+    分开维护等于有两套契约，会分叉漂移。
+    """
+    a = dc.build_tool(LEGAL)["function"]["parameters"]
+    b = dc.build_response_format(LEGAL)["json_schema"]["schema"]
+    assert a == b
+    assert dc.build_response_format(LEGAL)["json_schema"]["strict"] is True
+
+
+def test_response_format_path_parses_plain_json():
+    r = _resp(content='{"move": "h2e2", "thought": "t", "confidence": 0.7}')
+    d = dc.parse_response_format(r, LEGAL)
+    assert d and d["move"] == "h2e2" and d["source"] == "response_format"
+
+
+def test_response_format_path_rejects_bad_content():
+    assert dc.parse_response_format(_resp(content="not json"), LEGAL) is None
+    assert dc.parse_response_format(_resp(content='{"move":"z9z9"}'), LEGAL) is None
+    assert dc.parse_response_format(_resp(content=""), LEGAL) is None
+
+
+@pytest.mark.asyncio
+async def test_agent_picks_json_schema_channel_when_supported():
+    """能力位为真时应走 response_format，不应带工具。"""
+    class _JsonAdapter(_Adapter):
+        supports_response_format_json_schema = True
+        seen_choice = "unset"
+
+        async def chat(self, messages, tools=None, **kw):
+            self.seen_tools = tools
+            self.seen_choice = kw.get("tool_choice")
+            return _resp(content='{"move":"h2e2","thought":"t","confidence":0.9}')
+
+    adapter = _JsonAdapter(_resp())
+    agent = LLMAgent(AgentConfig(
+        name="t", color="Red", description="", llm_adapter=adapter,
+        system_prompt="s", use_tools=False, use_decision_contract=True))
+    agent._last_legal_moves = list(LEGAL)
+    res = await agent.think({"legal_moves": LEGAL, "turn": "Red"})
+
+    assert adapter.seen_tools is None, "json_schema 通道不应带工具"
+    assert adapter.seen_choice is None
+    assert res.move == "h2e2"
+    assert res.tool_results[0]["result"]["source"] == "response_format"
+
+
+@pytest.mark.asyncio
+async def test_agent_uses_tool_channel_when_json_schema_unsupported():
+    class _ToolAdapter(_Adapter):
+        supports_response_format_json_schema = False
+        seen_choice = "unset"
+
+        async def chat(self, messages, tools=None, **kw):
+            self.seen_tools = tools
+            self.seen_choice = kw.get("tool_choice")
+            return _resp(tool_calls=[{"name": "move_decision",
+                                      "arguments": {"move": "b0c2", "thought": "t",
+                                                    "confidence": 0.5}}])
+
+    adapter = _ToolAdapter(_resp())
+    agent = LLMAgent(AgentConfig(
+        name="t", color="Red", description="", llm_adapter=adapter,
+        system_prompt="s", use_tools=False, use_decision_contract=True))
+    agent._last_legal_moves = list(LEGAL)
+    res = await agent.think({"legal_moves": LEGAL, "turn": "Red"})
+
+    assert [t["function"]["name"] for t in adapter.seen_tools] == ["move_decision"]
+    assert adapter.seen_choice == "required"
+    assert res.move == "b0c2"
+    assert res.tool_results[0]["result"]["source"] == "contract"

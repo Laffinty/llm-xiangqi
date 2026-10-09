@@ -12,6 +12,7 @@
 两者混在一个注册表里会让人误以为它可以被模型自由调用，故独立于 `src/mcp_tools/`。
 """
 
+import json
 from typing import Any, Dict, List, Optional
 
 DECISION_TOOL_NAME = "move_decision"
@@ -68,6 +69,50 @@ def build_tool(legal_moves: List[str]) -> Optional[Dict[str, Any]]:
     fn["parameters"]["properties"]["move"] = {"type": "string", "enum": moves}
     tool["function"] = fn
     return tool
+
+
+def build_response_format(legal_moves: List[str]) -> Dict[str, Any]:
+    """构造 response_format: json_schema 版本（供不支持工具调用的供应商使用）。
+
+    与 build_tool 是同一份 schema 的两种投递方式，不是两套契约。
+    """
+    tool = build_tool(legal_moves)
+    if tool is None:
+        return None
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "move_decision",
+            "strict": True,
+            "schema": tool["function"]["parameters"],
+        },
+    }
+
+
+def parse_response_format(response: Any, legal_moves: List[str]) -> Optional[Dict[str, Any]]:
+    """从 response_format 路径的纯 JSON 文本里取决策。"""
+    content = getattr(response, "content", None)
+    if not content:
+        return None
+    try:
+        args = json.loads(content)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(args, dict):
+        return None
+    legal = {m.lower() for m in legal_moves}
+    move = args.get("move")
+    if not isinstance(move, str) or move.strip().lower() not in legal:
+        return None
+    conf = args.get("confidence")
+    try:
+        conf = float(conf) if conf is not None else None
+    except (TypeError, ValueError):
+        conf = None
+    thought = args.get("thought")
+    return {"move": move.strip().lower(),
+            "thought": thought if isinstance(thought, str) else None,
+            "confidence": conf, "source": "response_format"}
 
 
 def parse(response: Any, legal_moves: List[str]) -> Optional[Dict[str, Any]]:

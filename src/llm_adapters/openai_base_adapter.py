@@ -76,6 +76,11 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             params["tools"] = tools
             params["tool_choice"] = kwargs.get("tool_choice", "auto")
 
+        # 路径二：response_format 约束。不是所有供应商都支持 json_schema（
+        # DeepSeek 直接返回 400，见 F-012），故不能无条件注入。
+        if kwargs.get("response_format") is not None:
+            params["response_format"] = kwargs["response_format"]
+
         last_error = None
         start_time = time.perf_counter()
 

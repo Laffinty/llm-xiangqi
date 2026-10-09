@@ -14,32 +14,46 @@ class LLMAgent(BaseAgent):
     """通用 LLM Agent，通过注入的 adapter 适配任意 LLM 后端"""
 
     async def _chat(self, messages, tools):
-        """发一次请求，必要时在 tool_choice 上自动降级。
+        """发一次请求，按**该供应商实测支持的那条契约通道**走。
 
-        F-013 修订：`tool_choice: "required"` 被拒是 **thinking 模式特有**的现象。
-        thinking 关闭后（W-00）两家都支持 `required`。用 `required` 才能让契约
-        确定生效——`auto` 之下 MiMo 是否调用工具会随 prompt 复杂度漂移（实测 0/3）。
+        两家能力正好互补（F-026，均在完整对局 prompt 下实测）：
 
-        这里不把选择权交给配置，而是**先试 required、被拒再回落 auto**：
-        供应商行为会变，写死配置等于把当下的观测固化成永久假设。
+        | provider | 工具调用 + 函数内 strict + required | response_format: json_schema |
+        |---|---|---|
+        | DeepSeek | OK | 400 |
+        | MiMo | 会无视 required（长 prompt 下） | **OK** |
+
+        所以不能一刀切。也不把选择做成配置项——供应商行为会变，
+        写死等于把当天的观测固化成永久假设（F-013 就是这么错的）。
+        这里读适配器上实测标定的能力位，且两条通道都保留回落。
         """
         if not tools:
             return await self.config.llm_adapter.chat(messages, tools=None)
 
-        names = {t.get("function", {}).get("name") for t in tools}
-        # 只有一个工具时可以用 required 强制；混有棋盘能力工具时不行，
-        # 否则会逼模型去调 board_inspect 而不是回答问题。
-        forced = len(names) == 1
+        adapter = self.config.llm_adapter
+        contract = decision_contract.build_tool(self._last_legal_moves or [])
 
-        try:
-            return await self.config.llm_adapter.chat(
-                messages, tools=tools,
-                tool_choice="required" if forced else "auto")
-        except Exception as e:
-            if not forced or "tool_choice" not in str(e):
-                raise
-            return await self.config.llm_adapter.chat(
-                messages, tools=tools, tool_choice="auto")
+        # 路径二：供应商支持 response_format 时优先用它 —— MiMo 只吃这条路
+        if contract is not None and getattr(adapter, "supports_response_format_json_schema", False):
+            rf = decision_contract.build_response_format(self._last_legal_moves or [])
+            try:
+                return await adapter.chat(messages, tools=None, response_format=rf)
+            except Exception as e:
+                if "response_format" not in str(e):
+                    raise
+
+        # 路径一：工具调用 + strict + required —— DeepSeek 走这条路
+        if contract is not None:
+            try:
+                return await adapter.chat(messages, tools=[contract], tool_choice="required")
+            except Exception as e:
+                if "tool_choice" not in str(e):
+                    raise
+                return await adapter.chat(messages, tools=[contract], tool_choice="auto")
+
+        # 没有契约工具时才轮到棋盘能力工具
+        return await adapter.chat(messages, tools=tools,
+                                  tool_choice="auto" if len(tools) > 1 else "required")
 
     async def think(self, game_state: Dict[str, Any]) -> AgentResult:
         """思考走步
@@ -70,7 +84,10 @@ class LLMAgent(BaseAgent):
 
             # ---- 1. 决策契约 ----
             if self.config.use_decision_contract:
-                decision = decision_contract.parse(response, legal_moves)
+                # 两条通道两种返回形式：工具调用返 tool_calls，
+                # response_format 返纯 JSON 文本。同一套 schema，不是两套契约。
+                decision = (decision_contract.parse(response, legal_moves)
+                            or decision_contract.parse_response_format(response, legal_moves))
                 if decision:
                     return AgentResult(
                         success=True,
@@ -78,7 +95,7 @@ class LLMAgent(BaseAgent):
                         thought=decision["thought"] or (response.content or "")[:500],
                         tool_results=[{"tool": decision_contract.DECISION_TOOL_NAME,
                                        "arguments": {"move": decision["move"]},
-                                       "result": {"source": "contract",
+                                       "result": {"source": decision["source"],
                                                   "confidence": decision["confidence"]}}],
                     )
 

@@ -1,0 +1,727 @@
+{
+  "meta": {
+    "case_ids": [
+      "endgame_m14_p059",
+      "opening_p13",
+      "middlegame_p25",
+      "in_check_p111",
+      "opening_p05",
+      "middlegame_p41",
+      "endgame_m9_p085"
+    ],
+    "caveats": [
+      "3 局被回合上限截断，属未完成对局，不计入和棋判断。"
+    ],
+    "commit": "74753d2",
+    "dirty": false,
+    "matchups": [
+      "deepseek vs mimo"
+    ],
+    "max_turns": 40,
+    "models": {
+      "deepseek": "deepseek-flash",
+      "mimo": "mimo-v2.6-flash"
+    },
+    "note": "temperature=0 为评测设定，非仓库默认；use_tools 取自 config（当前 false）",
+    "seed": 42,
+    "temperature": 0.0,
+    "thinking": false
+  },
+  "raw": [
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "endgame_m14_p059",
+      "category": "endgame",
+      "elapsed_sec": 134.62,
+      "move_history": [
+        "e5e6",
+        "c4b4",
+        "e6e7",
+        "c9e7",
+        "g4g5",
+        "g6g5",
+        "i2g4",
+        "g5g4",
+        "c0a2",
+        "e7g5",
+        "e1d2",
+        "g5i7",
+        "d2e1",
+        "i4i3",
+        "a2c4",
+        "b4c4",
+        "e1d2",
+        "i3i2",
+        "f2f1",
+        "i7g5",
+        "f1f2",
+        "g4g3",
+        "d2e1",
+        "g3f3"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 12,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 12,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 13,
+          "illegal": 0,
+          "illegal_rate": 0.0769,
+          "legal": 12,
+          "parse_failures": 1
+        }
+      },
+      "moves_played": 24,
+      "red": "deepseek",
+      "result": "black_win",
+      "result_reason": "Red resigned: {\"thought\":\"红方仅剩帅和仕，黑方车马炮多子围攻，红方已被困毙，无合法走步，只能认输。\",\"move\": \"jxjx\"}",
+      "starting_fen": "2b1ka3/9/b4a3/6p2/4P4/2p3P1p/9/5K2B/4A4/2B6 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 2537,
+          "content_only_turns": 12,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 12,
+          "prompt_tokens": 33521,
+          "tool_call_turns": 0,
+          "total_tokens": 36058
+        },
+        "Red": {
+          "completion_tokens": 5706,
+          "content_only_turns": 2,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 15,
+          "prompt_tokens": 39181,
+          "tool_call_turns": 13,
+          "total_tokens": 44887
+        }
+      },
+      "turn_count": 24
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "opening_p13",
+      "category": "opening",
+      "elapsed_sec": 228.98,
+      "move_history": [
+        "b6b9",
+        "c7b9",
+        "b3b7",
+        "i7b7",
+        "b0c2",
+        "h4e4",
+        "c2e1",
+        "e4f4",
+        "i0i1",
+        "f4f6",
+        "e2c4",
+        "f6f4",
+        "i1f1",
+        "f4d4",
+        "f1f4",
+        "d4e4",
+        "f4e4",
+        "e5e4",
+        "e3e4",
+        "b7e7",
+        "c4e2",
+        "e7e6",
+        "a0a2",
+        "i9i8",
+        "e4e5",
+        "e6e2",
+        "a2e2",
+        "g7e6",
+        "e5e6",
+        "i8e8",
+        "e6f6",
+        "e8e5",
+        "e1c2",
+        "e5e2",
+        "g0e2",
+        "a9a7",
+        "f6g6",
+        "a7e7",
+        "c2e3",
+        "e7e3"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "r1bakab1r/9/2n3n1c/1Cp3p1p/p3p4/7c1/PCP1P1P1P/4B4/9/RN1AKABNR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 3933,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 62465,
+          "tool_call_turns": 0,
+          "total_tokens": 66398
+        },
+        "Red": {
+          "completion_tokens": 9388,
+          "content_only_turns": 1,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 21,
+          "prompt_tokens": 60263,
+          "tool_call_turns": 20,
+          "total_tokens": 69651
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_p25",
+      "category": "middlegame",
+      "elapsed_sec": 252.96,
+      "move_history": [
+        "b4e4",
+        "e5e4",
+        "a6i6",
+        "i7i8",
+        "i6i9",
+        "i8i1",
+        "i9i1",
+        "h5g3",
+        "e2c0",
+        "h2e2",
+        "c0e2",
+        "a9a8",
+        "i1i2",
+        "g3i2",
+        "g0i2",
+        "a8d8",
+        "e3e4",
+        "d8d3",
+        "e2g0",
+        "d3c3",
+        "i2g4",
+        "c3e3",
+        "b0c2",
+        "e3e4",
+        "c2e3",
+        "e4e3",
+        "h0g2",
+        "e3e2",
+        "g4e2",
+        "b9c7",
+        "a0d0",
+        "c7e8",
+        "d0d8",
+        "e8d6",
+        "d8d9",
+        "e9d9",
+        "g2f4",
+        "g5g4",
+        "e2g4",
+        "d6f7"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "rn1akab1r/9/8c/C1p5p/p1b1p1pn1/1C7/P1P1P1P1P/4B2c1/4A3R/RN2KABN1 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 3773,
+          "content_only_turns": 19,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 59374,
+          "tool_call_turns": 1,
+          "total_tokens": 63147
+        },
+        "Red": {
+          "completion_tokens": 12710,
+          "content_only_turns": 3,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 23,
+          "prompt_tokens": 65559,
+          "tool_call_turns": 20,
+          "total_tokens": 78269
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "in_check_p111",
+      "category": "in_check",
+      "elapsed_sec": 179.31,
+      "move_history": [
+        "e2c0",
+        "d8f7",
+        "d4d6",
+        "f7d6",
+        "b6c6",
+        "d6f5",
+        "c6i6",
+        "i2i6",
+        "g4g5",
+        "c5c4",
+        "g5h5",
+        "e3f3",
+        "h5h6",
+        "f3f0",
+        "h6i6",
+        "f0c0",
+        "e4e5",
+        "g2f2",
+        "i6i7",
+        "g9i7",
+        "e5e6",
+        "f5e7",
+        "e6e7",
+        "c4c3",
+        "e7e8",
+        "d7e8"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 14,
+          "illegal": 0,
+          "illegal_rate": 0.0714,
+          "legal": 13,
+          "parse_failures": 1
+        },
+        "Red": {
+          "decisions": 14,
+          "illegal": 0,
+          "illegal_rate": 0.0714,
+          "legal": 13,
+          "parse_failures": 1
+        }
+      },
+      "moves_played": 26,
+      "red": "deepseek",
+      "result": "black_win",
+      "result_reason": "Red resigned: {\"thought\": \"红方仅剩帅一子，非将帅棋子为0个，符合子力严重不足的投降标准。\", \"move\": \"jxjx\"}",
+      "starting_fen": "4kab2/3n5/3a1C3/1C7/2p1p1bn1/r1PRP1P2/4c4/4BAp1r/9/4KA3 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 3269,
+          "content_only_turns": 14,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 14,
+          "prompt_tokens": 44033,
+          "tool_call_turns": 0,
+          "total_tokens": 47302
+        },
+        "Red": {
+          "completion_tokens": 7891,
+          "content_only_turns": 1,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 15,
+          "prompt_tokens": 40523,
+          "tool_call_turns": 14,
+          "total_tokens": 48414
+        }
+      },
+      "turn_count": 26
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "opening_p05",
+      "category": "opening",
+      "elapsed_sec": 289.79,
+      "move_history": [
+        "b6b9",
+        "a9b9",
+        "a2e2",
+        "b7d7",
+        "e2e5",
+        "b9b5",
+        "e5e7",
+        "b5e5",
+        "e7f7",
+        "e5f5",
+        "f7f8",
+        "d7e7",
+        "g0e2",
+        "f5f1",
+        "h0f1",
+        "i9i7",
+        "f8f6",
+        "e7e5",
+        "f6f7",
+        "i7f7",
+        "i0i1",
+        "f7f2",
+        "f1h2",
+        "f2e2",
+        "c0e2",
+        "g9e7",
+        "a3a4",
+        "e5f5",
+        "i1f1",
+        "f5e5",
+        "f1f9",
+        "e9f9",
+        "a0a3",
+        "h4f4",
+        "a4a5",
+        "e5e2",
+        "a5a6",
+        "f4f3",
+        "h2f3",
+        "e2c2"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 20,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "rnbakabnr/9/1c7/pCp3p1p/4p4/7c1/P1P1P1P1P/C8/9/RNBAKABNR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 4702,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 66025,
+          "tool_call_turns": 0,
+          "total_tokens": 70727
+        },
+        "Red": {
+          "completion_tokens": 12898,
+          "content_only_turns": 2,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 22,
+          "prompt_tokens": 64044,
+          "tool_call_turns": 20,
+          "total_tokens": 76942
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_p41",
+      "category": "middlegame",
+      "elapsed_sec": 152.03,
+      "move_history": [
+        "f6f7",
+        "e8f7",
+        "b2b9",
+        "h9h8",
+        "b9b7",
+        "a6b6",
+        "b7f7",
+        "h8e8",
+        "f7f8",
+        "e8f8",
+        "a0a4",
+        "f8f7",
+        "a4a9",
+        "b6b9",
+        "a9b9",
+        "e7c9",
+        "b9c9",
+        "e9e8",
+        "c9f9",
+        "f7f0",
+        "e0f0",
+        "c2c0",
+        "f9f8",
+        "e8e9",
+        "f8f9",
+        "e9e8",
+        "f9f8",
+        "e8e7",
+        "f8f7",
+        "e7e8",
+        "f7f8"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 15,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 15,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 16,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 16,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 31,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "三次重复局面，判和",
+      "starting_fen": "1n2kabr1/4a4/4bc3/rCp2R3/4p1pnp/p5B2/2P1P1P1P/1Cc6/4A4/R3KABN1 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 2461,
+          "content_only_turns": 15,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 15,
+          "prompt_tokens": 44167,
+          "tool_call_turns": 0,
+          "total_tokens": 46628
+        },
+        "Red": {
+          "completion_tokens": 5228,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 16,
+          "prompt_tokens": 47659,
+          "tool_call_turns": 16,
+          "total_tokens": 52887
+        }
+      },
+      "turn_count": 31
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "endgame_m9_p085",
+      "category": "endgame",
+      "elapsed_sec": 145.03,
+      "move_history": [
+        "f7f8",
+        "e8f7",
+        "f8f9",
+        "e9f9",
+        "a2c4",
+        "c9e7",
+        "f0e1",
+        "i2i1",
+        "c4e2",
+        "i1i0",
+        "d2d1",
+        "f7e8",
+        "e2g4",
+        "i0h0",
+        "g4e2",
+        "e7g9",
+        "e2g4",
+        "h0i0",
+        "g4e2",
+        "i0h0",
+        "e2g4",
+        "h0i0",
+        "g4e2",
+        "i0h0"
+      ],
+      "move_quality": {
+        "Black": {
+          "decisions": 12,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 12,
+          "parse_failures": 0
+        },
+        "Red": {
+          "decisions": 12,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 12,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 24,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "三次重复局面，判和",
+      "starting_fen": "2b1k4/4a4/b4P3/9/9/9/9/B2K4p/9/5A3 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 2089,
+          "content_only_turns": 12,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 12,
+          "prompt_tokens": 32647,
+          "tool_call_turns": 0,
+          "total_tokens": 34736
+        },
+        "Red": {
+          "completion_tokens": 5819,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 12,
+          "prompt_tokens": 32038,
+          "tool_call_turns": 12,
+          "total_tokens": 37857
+        }
+      },
+      "turn_count": 24
+    }
+  ],
+  "schema": "llm-xiangqi/eval-report@2",
+  "summary": {
+    "by_category": {
+      "endgame": {
+        "aborted": 0,
+        "black_win": 1,
+        "draw_by_cap": 0,
+        "draw_natural": 1,
+        "games": 2,
+        "mean_ply": 24.0,
+        "red_win": 0
+      },
+      "in_check": {
+        "aborted": 0,
+        "black_win": 1,
+        "draw_by_cap": 0,
+        "draw_natural": 0,
+        "games": 1,
+        "mean_ply": 26.0,
+        "red_win": 0
+      },
+      "middlegame": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 1,
+        "draw_natural": 1,
+        "games": 2,
+        "mean_ply": 35.5,
+        "red_win": 0
+      },
+      "opening": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 2,
+        "draw_natural": 0,
+        "games": 2,
+        "mean_ply": 40.0,
+        "red_win": 0
+      }
+    },
+    "decisive_games": 2,
+    "games": 7,
+    "mean_elapsed_sec": 197.53,
+    "mean_ply": 32.14,
+    "mean_tokens_per_turn": 3439.6,
+    "move_quality": {
+      "Black": {
+        "decisions": 113,
+        "illegal": 0,
+        "illegal_rate": 0.0088,
+        "legal": 112,
+        "measured": true,
+        "parse_failures": 1
+      },
+      "Red": {
+        "decisions": 115,
+        "illegal": 0,
+        "illegal_rate": 0.0174,
+        "legal": 113,
+        "measured": true,
+        "parse_failures": 2
+      }
+    },
+    "outcome": {
+      "aborted": 0,
+      "black_win": 2,
+      "draw_by_cap": 3,
+      "draw_natural": 2,
+      "red_win": 0,
+      "unknown": 0
+    },
+    "result_reasons": [
+      "Maximum turns reached",
+      "Red resigned: {\"thought\": \"红方仅剩帅一子，非将帅棋子为0个，符合子力严重不足的投降标准。\", \"move\": \"jxjx\"}",
+      "Red resigned: {\"thought\":\"红方仅剩帅和仕，黑方车马炮多子围攻，红方已被困毙，无合法走步，只能认输。\",\"move\": \"jxjx\"}",
+      "三次重复局面，判和"
+    ],
+    "sides": {
+      "Black": {
+        "completion_tokens": 22764,
+        "content_only_turns": 112,
+        "errors": 0,
+        "llm_calls": 113,
+        "prompt_tokens": 342232,
+        "text_only_ratio": 0.99
+      },
+      "Red": {
+        "completion_tokens": 59640,
+        "content_only_turns": 9,
+        "errors": 0,
+        "llm_calls": 124,
+        "prompt_tokens": 349267,
+        "text_only_ratio": 0.07
+      }
+    },
+    "warnings": [
+      "3 局被回合上限截断，属未完成对局，不计入和棋判断。"
+    ]
+  }
+}
