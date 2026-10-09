@@ -51,6 +51,22 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 \
 【deepseek】只能用deepseek-flash，KEY是sk-yyyy
 ```
 
+### 局面集
+
+| 文件 | 来源 | 用途 |
+|---|---|---|
+| `tests/eval/cases.json` | 引擎实走生成的**冻结集** | 所有已有基线用它，作为对比的控制变量 |
+| `tests/eval/cases_real.json` | 2026-10-10 真实对局（13 手红方将死胜） | 更贴近真实分布；用 `--cases-file` 选择 |
+
+**`--compare` 必须两侧用同一套局面集**，否则差异无法归因。报告的 `meta.cases_file`
+会记录实际使用的那套。
+
+`cases_real.json` 只收录「轮到红方且有合法走步」的局面：`GameController` 硬编码
+`phase=RED_TO_MOVE`，黑方走棋的局面会把该走法派给错误的 Agent；
+终局（0 合法走步）保留在 `source_game` 里而不是 `cases`。
+
+---
+
 ## 确定性
 
 **LLM 采样本身不确定，两次 live 跑不可能逐字节一致。**

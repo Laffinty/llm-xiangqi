@@ -336,6 +336,8 @@ async def cmd_run(args) -> int:
         "matchups": ["%s vs %s" % m for m in matchups],
         "case_ids": [c.case_id for c in ordered],
         "models": {n: providers.PROVIDERS[n]["model"] for n in providers.PROVIDERS},
+        # 记录用的哪套局面集：不记得就无法归因
+        "cases_file": cases_mod.describe(args.cases_file),
         "note": "temperature=0 为评测设定，非仓库默认；use_tools 取自 config（当前 false）",
     }
     doc = report.build(records, meta)
@@ -371,14 +373,19 @@ def main(argv=None) -> int:
                          "报告格式演进后用它替代重跑。")
     ap.add_argument("--restate-note", action="append", default=None,
                     help="追加到 meta.notes 的说明，可多次")
+    ap.add_argument("--cases-file", default=None,
+                    help="局面集文件；默认 cases.json（冻结集）。"
+                         "cases_real.json 为真实对局集，"
+                         "**对比必须用同一套局面集**")
     ap.add_argument("--cases-only", action="store_true")
     ap.add_argument("--probe", action="store_true")
     args = ap.parse_args(argv)
 
     try:
         if args.cases_only:
-            cs = cases_mod.load()
-            print("%d 个局面全部复验通过" % len(cs))
+            cs = cases_mod.load(args.cases_file)
+            print("[%s] %d 个局面全部复验通过"
+                  % (cases_mod.describe(args.cases_file), len(cs)))
             for c in cs:
                 print("  %-22s %-14s moves=%-3d" % (c.case_id, c.category, c["legal_moves"]))
             return 0

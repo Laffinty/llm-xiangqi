@@ -49,8 +49,17 @@ def validate(cases: List[Dict]) -> None:
         )
 
 
+REAL_PATH = Path(__file__).parent / "cases_real.json"
+
+
+def describe(path: Path = None) -> str:
+    """报告里要记下用的是哪套局面集——不记就无法归因。"""
+    p = Path(path) if path else CASES_PATH
+    return p.name if p.exists() else str(p)
+
+
 def load(path: Path = None) -> List[Case]:
-    path = path or CASES_PATH
+    path = Path(path) if path else CASES_PATH
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     cases = [Case(c) for c in data["cases"]]
     validate(cases)

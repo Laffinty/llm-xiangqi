@@ -1,0 +1,128 @@
+{
+  "_note": "Positions from a real game, parallel to the frozen cases.json. Select with --cases-file. Comparisons MUST use the same case set, otherwise deltas cannot be attributed.",
+  "source_game": {
+    "initial_fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+    "moves": [
+      "b2e2",
+      "h7h0",
+      "i0h0",
+      "b7e7",
+      "e2e6",
+      "f9e8",
+      "e6e5",
+      "i9i8",
+      "h2e2",
+      "e7e6",
+      "h0h9",
+      "i8i7",
+      "h9g9"
+    ],
+    "result": "red_win",
+    "plies": 13,
+    "final_fen": "rnbak1R2/4a4/8r/p1p1c1p1p/4C4/9/P1P1P1P1P/4C4/9/RNBAKAB2 b - - 0 1",
+    "final_reason": "红方胜利 - 黑方被将死",
+    "origin": "2026-10-10 Web 3D session",
+    "skipped": [
+      {
+        "ply": 1,
+        "red_to_move": false,
+        "legal": 45,
+        "why": "black to move"
+      },
+      {
+        "ply": 3,
+        "red_to_move": false,
+        "legal": 35,
+        "why": "black to move"
+      },
+      {
+        "ply": 5,
+        "red_to_move": false,
+        "legal": 11,
+        "why": "black to move"
+      },
+      {
+        "ply": 7,
+        "red_to_move": false,
+        "legal": 16,
+        "why": "black to move"
+      },
+      {
+        "ply": 9,
+        "red_to_move": false,
+        "legal": 19,
+        "why": "black to move"
+      },
+      {
+        "ply": 11,
+        "red_to_move": false,
+        "legal": 17,
+        "why": "black to move"
+      },
+      {
+        "ply": 13,
+        "red_to_move": false,
+        "legal": 0,
+        "why": "terminal"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "real_p00",
+      "category": "opening",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "legal_moves": 44,
+      "last_move": null,
+      "note": "real game, red to move after ply 0"
+    },
+    {
+      "id": "real_p02",
+      "category": "opening",
+      "fen": "rnbakabnr/9/1c7/p1p1p1p1p/9/9/P1P1P1P1P/4C2C1/9/RNBAKABcR w - - 0 1",
+      "legal_moves": 33,
+      "last_move": "h7h0",
+      "note": "real game, red to move after ply 2 (h7h0)"
+    },
+    {
+      "id": "real_p04",
+      "category": "opening",
+      "fen": "rnbakabnr/9/4c4/p1p1p1p1p/9/9/P1P1P1P1P/4C2C1/9/RNBAKABR1 w - - 0 1",
+      "legal_moves": 34,
+      "last_move": "b7e7",
+      "note": "real game, red to move after ply 4 (b7e7)"
+    },
+    {
+      "id": "real_p06",
+      "category": "opening",
+      "fen": "rnbak1bnr/4a4/4c4/p1p1C1p1p/9/9/P1P1P1P1P/7C1/9/RNBAKABR1 w - - 0 1",
+      "legal_moves": 35,
+      "last_move": "f9e8",
+      "note": "real game, red to move after ply 6 (f9e8)"
+    },
+    {
+      "id": "real_p08",
+      "category": "middlegame",
+      "fen": "rnbak1bn1/4a3r/4c4/p1p3p1p/4C4/9/P1P1P1P1P/7C1/9/RNBAKABR1 w - - 0 1",
+      "legal_moves": 35,
+      "last_move": "i9i8",
+      "note": "real game, red to move after ply 8 (i9i8)"
+    },
+    {
+      "id": "real_p10",
+      "category": "middlegame",
+      "fen": "rnbak1bn1/4a3r/9/p1p1c1p1p/4C4/9/P1P1P1P1P/4C4/9/RNBAKABR1 w - - 0 1",
+      "legal_moves": 43,
+      "last_move": "e7e6",
+      "note": "real game, red to move after ply 10 (e7e6)"
+    },
+    {
+      "id": "real_p12",
+      "category": "middlegame",
+      "fen": "rnbak1bR1/4a4/8r/p1p1c1p1p/4C4/9/P1P1P1P1P/4C4/9/RNBAKAB2 w - - 0 1",
+      "legal_moves": 44,
+      "last_move": "i8i7",
+      "note": "real game, red to move after ply 12 (i8i7)"
+    }
+  ]
+}
