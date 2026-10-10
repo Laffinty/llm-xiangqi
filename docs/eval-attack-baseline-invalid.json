@@ -1,0 +1,2685 @@
+{
+  "meta": {
+    "case_ids": [
+      "endgame_m14_p059",
+      "opening_p13",
+      "middlegame_p25",
+      "in_check_p111",
+      "opening_p05"
+    ],
+    "cases_file": "cases_attack.json",
+    "caveats": [
+      "本批无胜负局：胜负指标不可观测，不能据此比较棋力。可用指标为 token 成本 / 耗时 / 走步合法率 / text_only_ratio。",
+      "4 局被回合上限截断，属未完成对局，不计入和棋判断。",
+      "激活一致性：红方 1.0、黑方 1.0（1.0 = 每回合激活均与局面一致）",
+      "空激活率：红方 0.0、黑方 0.0（一致性 1.0 也可能来自两边同时为空，故设绝对上限门禁）",
+      "决策来源：红方兜底率 0.0、黑方兜底率 0.0125（0 = 全部走契约）。"
+    ],
+    "commit": "4fce23e",
+    "dirty": false,
+    "matchups": [
+      "deepseek vs mimo"
+    ],
+    "max_turns": 40,
+    "models": {
+      "deepseek": "deepseek-flash",
+      "mimo": "mimo-v2.6-flash"
+    },
+    "note": "temperature=0 为评测设定，非仓库默认；use_tools 取自 config（当前 false）",
+    "seed": 42,
+    "temperature": 0.0,
+    "thinking": false
+  },
+  "raw": [
+    {
+      "aborted": null,
+      "activations": {
+        "Black": [],
+        "Red": [
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ]
+      },
+      "black": "mimo",
+      "case_id": "endgame_m14_p059",
+      "category": "endgame",
+      "elapsed_sec": 122.77,
+      "move_history": [
+        "e5e6"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 0,
+          "decisions": 0,
+          "fallback_rate": null,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": null,
+          "legal": 0,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 1,
+          "decisions": 1,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 1,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 1,
+      "red": "deepseek",
+      "result": "in_progress",
+      "result_reason": null,
+      "starting_fen": "2b1ka3/9/b4a3/6p2/4P4/2p3P1p/9/5K2B/4A4/2B6 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 0,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 1,
+          "prompt_tokens": 0,
+          "tool_call_turns": 0,
+          "total_tokens": 0
+        },
+        "Red": {
+          "completion_tokens": 317,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 1,
+          "prompt_tokens": 2285,
+          "tool_call_turns": 1,
+          "total_tokens": 2602
+        }
+      },
+      "turn_count": 1
+    },
+    {
+      "aborted": null,
+      "activations": {
+        "Black": [
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ],
+        "Red": [
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ]
+      },
+      "black": "mimo",
+      "case_id": "opening_p13",
+      "category": "opening",
+      "elapsed_sec": 637.42,
+      "move_history": [
+        "b6g6",
+        "g7e6",
+        "g6c6",
+        "h4e4",
+        "e3e4",
+        "i7i3",
+        "i0i3",
+        "i6i5",
+        "c6c9",
+        "a9c9",
+        "b3b9",
+        "c9b9",
+        "i3i5",
+        "i9i5",
+        "h0i2",
+        "i5i2",
+        "g0i2",
+        "b9b0",
+        "a0b0",
+        "e5e4",
+        "b0b5",
+        "c7b5",
+        "e2c4",
+        "b5c3",
+        "c4a2",
+        "c3a4",
+        "a3a4",
+        "a5a4",
+        "i2g0",
+        "e6d4",
+        "a2c4",
+        "d4e2",
+        "c4e2",
+        "e4f4",
+        "g3g4",
+        "f4g4",
+        "g0i2",
+        "g4g3",
+        "i2g4",
+        "g3h3"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "r1bakab1r/9/2n3n1c/1Cp3p1p/p3p4/7c1/PCP1P1P1P/4B4/9/RN1AKABNR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 5218,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 45103,
+          "tool_call_turns": 0,
+          "total_tokens": 50321
+        },
+        "Red": {
+          "completion_tokens": 7701,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 49675,
+          "tool_call_turns": 20,
+          "total_tokens": 57376
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "activations": {
+        "Black": [
+          {
+            "actual": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ],
+        "Red": [
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ]
+      },
+      "black": "mimo",
+      "case_id": "middlegame_p25",
+      "category": "middlegame",
+      "elapsed_sec": 220.55,
+      "move_history": [
+        "b4e4",
+        "i7e7",
+        "a6a7",
+        "e5e4",
+        "i1f1",
+        "h5g3",
+        "f1f9",
+        "e9f9",
+        "a7a8",
+        "a9a8",
+        "e3e4",
+        "e7e2",
+        "g0e2",
+        "g3e2",
+        "b0c2",
+        "e2c1",
+        "e0d0",
+        "a8d8",
+        "e1d2",
+        "c1e2",
+        "d0d1",
+        "e2f0",
+        "a0f0",
+        "f9e9",
+        "f0f9",
+        "e9f9",
+        "i3i4",
+        "d8d2",
+        "d1d2",
+        "h2c2",
+        "h0g2",
+        "c2g2",
+        "e4e5",
+        "g2g3",
+        "i4i5",
+        "i6i5",
+        "e5e6",
+        "g3a3",
+        "e6e7",
+        "g9e7"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 19,
+          "decisions": 20,
+          "fallback_rate": 0.05,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "rn1akab1r/9/8c/C1p5p/p1b1p1pn1/1C7/P1P1P1P1P/4B2c1/4A3R/RN2KABN1 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 6368,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 48000,
+          "tool_call_turns": 0,
+          "total_tokens": 54368
+        },
+        "Red": {
+          "completion_tokens": 7860,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 51086,
+          "tool_call_turns": 20,
+          "total_tokens": 58946
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "activations": {
+        "Black": [
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ],
+        "Red": [
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "endgame-technique",
+              "repetition-management"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "check-defense",
+              "endgame-technique",
+              "repetition-management"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": true
+          }
+        ]
+      },
+      "black": "mimo",
+      "case_id": "in_check_p111",
+      "category": "in_check",
+      "elapsed_sec": 171.13,
+      "move_history": [
+        "e0d0",
+        "d8f7",
+        "d4d6",
+        "c5c4",
+        "d6d3",
+        "g2f2",
+        "d3d7",
+        "a4a0",
+        "d0d1",
+        "i2i1",
+        "f0e1",
+        "i1e1",
+        "d1d2",
+        "e1e2",
+        "d2d1",
+        "e2d2",
+        "d1d2",
+        "a0a2",
+        "d2d1",
+        "a2d2",
+        "d1d2",
+        "f2e2",
+        "d2e2",
+        "h5g3",
+        "e2e1",
+        "g3e4",
+        "d7d9",
+        "e9d9",
+        "b6b4",
+        "c4b4",
+        "g4g5",
+        "f7g5",
+        "e1f1",
+        "e4g3",
+        "f1f2",
+        "g3h1",
+        "f2f1",
+        "h1g3",
+        "f1e1",
+        "g3f1"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "4kab2/3n5/3a1C3/1C7/2p1p1bn1/r1PRP1P2/4c4/4BAp1r/9/4KA3 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 4562,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 47625,
+          "tool_call_turns": 0,
+          "total_tokens": 52187
+        },
+        "Red": {
+          "completion_tokens": 7520,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 52231,
+          "tool_call_turns": 20,
+          "total_tokens": 59751
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "activations": {
+        "Black": [
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ],
+        "Red": [
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "board_phase": "opening",
+            "expected": [
+              "check-defense",
+              "game-narrative",
+              "opening-development"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "check-defense",
+              "middlegame-tactics"
+            ],
+            "in_check": true,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "middlegame-tactics"
+            ],
+            "board_phase": "middlegame",
+            "expected": [
+              "middlegame-tactics"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          },
+          {
+            "actual": [
+              "endgame-technique"
+            ],
+            "board_phase": "endgame",
+            "expected": [
+              "endgame-technique"
+            ],
+            "in_check": false,
+            "match": true,
+            "repetition_warning": false
+          }
+        ]
+      },
+      "black": "mimo",
+      "case_id": "opening_p05",
+      "category": "opening",
+      "elapsed_sec": 171.62,
+      "move_history": [
+        "a2a6",
+        "a9a6",
+        "b6b9",
+        "h4e4",
+        "e3e4",
+        "e5e4",
+        "b9d9",
+        "b7e7",
+        "d0e1",
+        "e7e1",
+        "f0e1",
+        "e9d9",
+        "c0e2",
+        "a6a3",
+        "a0a3",
+        "i9i8",
+        "a3a9",
+        "i8a8",
+        "a9a8",
+        "c9e7",
+        "a8a9",
+        "e7c9",
+        "a9c9",
+        "d9d8",
+        "c9c8",
+        "d8d7",
+        "c8d8",
+        "d7d8",
+        "i0i2",
+        "g9i7",
+        "i2f2",
+        "h9f8",
+        "f2f8",
+        "d8d9",
+        "f8d8",
+        "d9d8",
+        "b0c2",
+        "d8e8",
+        "c2e3",
+        "e4e3"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "rnbakabnr/9/1c7/pCp3p1p/4p4/7c1/P1P1P1P1P/C8/9/RNBAKABNR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 4800,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 46324,
+          "tool_call_turns": 0,
+          "total_tokens": 51124
+        },
+        "Red": {
+          "completion_tokens": 7712,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 51906,
+          "tool_call_turns": 20,
+          "total_tokens": 59618
+        }
+      },
+      "turn_count": 40
+    }
+  ],
+  "schema": "llm-xiangqi/eval-report@2",
+  "summary": {
+    "activation": {
+      "Black": {
+        "consistency": 1.0,
+        "empty": 0,
+        "empty_rate": 0.0,
+        "matches": 80,
+        "measured": true,
+        "turns": 80
+      },
+      "Red": {
+        "consistency": 1.0,
+        "empty": 0,
+        "empty_rate": 0.0,
+        "matches": 81,
+        "measured": true,
+        "turns": 81
+      }
+    },
+    "by_category": {
+      "endgame": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 0,
+        "draw_natural": 0,
+        "games": 1,
+        "mean_ply": 1.0,
+        "red_win": 0
+      },
+      "in_check": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 1,
+        "draw_natural": 0,
+        "games": 1,
+        "mean_ply": 40.0,
+        "red_win": 0
+      },
+      "middlegame": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 1,
+        "draw_natural": 0,
+        "games": 1,
+        "mean_ply": 40.0,
+        "red_win": 0
+      },
+      "opening": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 2,
+        "draw_natural": 0,
+        "games": 2,
+        "mean_ply": 40.0,
+        "red_win": 0
+      }
+    },
+    "decisive_games": 0,
+    "games": 5,
+    "mean_elapsed_sec": 264.7,
+    "mean_ply": 32.2,
+    "mean_tokens_per_turn": 2772.0,
+    "move_quality": {
+      "Black": {
+        "contract_hits": 79,
+        "decisions": 80,
+        "fallback_rate": 0.0125,
+        "fallbacks": 1,
+        "illegal": 0,
+        "illegal_rate": 0.0,
+        "legal": 80,
+        "measured": true,
+        "parse_failures": 0
+      },
+      "Red": {
+        "contract_hits": 81,
+        "decisions": 81,
+        "fallback_rate": 0.0,
+        "fallbacks": 0,
+        "illegal": 0,
+        "illegal_rate": 0.0,
+        "legal": 81,
+        "measured": true,
+        "parse_failures": 0
+      }
+    },
+    "outcome": {
+      "aborted": 0,
+      "black_win": 0,
+      "draw_by_cap": 4,
+      "draw_natural": 0,
+      "red_win": 0,
+      "unknown": 1
+    },
+    "result_reasons": [
+      "",
+      "Maximum turns reached"
+    ],
+    "sides": {
+      "Black": {
+        "completion_tokens": 20948,
+        "content_only_turns": 80,
+        "errors": 0,
+        "llm_calls": 81,
+        "prompt_tokens": 187052,
+        "text_only_ratio": 0.99
+      },
+      "Red": {
+        "completion_tokens": 31110,
+        "content_only_turns": 0,
+        "errors": 0,
+        "llm_calls": 81,
+        "prompt_tokens": 207183,
+        "text_only_ratio": 0.0
+      }
+    },
+    "warnings": [
+      "本批无胜负局：胜负指标不可观测，不能据此比较棋力。可用指标为 token 成本 / 耗时 / 走步合法率 / text_only_ratio。",
+      "4 局被回合上限截断，属未完成对局，不计入和棋判断。",
+      "激活一致性：红方 1.0、黑方 1.0（1.0 = 每回合激活均与局面一致）",
+      "空激活率：红方 0.0、黑方 0.0（一致性 1.0 也可能来自两边同时为空，故设绝对上限门禁）",
+      "决策来源：红方兜底率 0.0、黑方兜底率 0.0125（0 = 全部走契约）。"
+    ]
+  }
+}

@@ -304,7 +304,10 @@ def cmd_restate(path: str, notes) -> int:
 
 async def cmd_run(args) -> int:
     keys = providers.load_keys(args.api_file)
-    all_cases = cases_mod.load()
+    # **必须传 args.cases_file**：原代码写的是 `cases_mod.load()`（走默认集），
+    # 而 meta 里却用 `describe(args.cases_file)` 记录——于是报告自述用了新集、
+    # 实际跑的却是旧集。A/B 归因直接失效且**不会报错**（`P-13` 实测踩中）。
+    all_cases = cases_mod.load(args.cases_file)
     if args.only_category:
         all_cases = [c for c in all_cases if c.category in args.only_category]
     ordered = cases_mod.order(all_cases, args.seed)[: args.games or None]

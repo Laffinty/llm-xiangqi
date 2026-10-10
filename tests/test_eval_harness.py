@@ -353,3 +353,54 @@ def test_real_report_is_not_vacuous():
         assert s[side]["measured"], "%s 未采集激活数据" % side
         assert s[side]["empty_rate"] == 0.0, \
             "%s 空激活率 %s，一致性 1.0 可能是空转" % (side, s[side]["empty_rate"])
+
+
+class TestCasesFileIsActuallyUsed:
+    """`P-13` 守卫：`--cases-file` 必须**真正生效**，且报告自述与实际一致。
+
+    实测踩中的 bug：`run.py` 曾写成 `cases_mod.load()`（走默认集 `cases.json`），
+    而 `meta.cases_file` 却用 `describe(args.cases_file)` 记录——于是
+    报告声称用了新集、`case_ids` 却是旧集的局面，**全程不报错**。
+    A/B 归因因此完全失效，且极难被发现。
+
+    这个 bug 之所以能活到今天，是因为 `--cases-only` 那条路径**正确传参**，
+    我用它验证新文件时看到「5 个局面全部复验通过」，就误以为主路径也没问题。
+    """
+
+    ATTACK_FILE = "tests/eval/cases_attack.json"
+
+    def test_cmd_run_passes_cases_file_to_load(self):
+        """`cmd_run` 必须把 `args.cases_file` 传给 `cases_mod.load`。"""
+        import inspect
+        src = inspect.getsource(run_mod.cmd_run)
+        # 只看代码行（剔除注释与文档字符串），否则会被说明文字里的同名字符串误伤
+        code_lines = [ln.strip() for ln in src.splitlines()
+                      if ln.strip() and not ln.strip().startswith("#")]
+        code = "\n".join(code_lines)
+        # 允许裸 load() 出现在 docstring 里（若函数有），但实际调用必须带参数
+        assert "cases_mod.load(args.cases_file)" in src, \
+            "cmd_run 必须用 cases_mod.load(args.cases_file)"
+        import re
+        bare = re.findall(r"cases_mod\.load\(\s*\)", code)
+        assert not bare, "cmd_run 仍有裸 cases_mod.load()，会静默使用默认局面集"
+
+    def test_meta_matches_actual_cases(self):
+        """`meta` 记录的 case_ids 必须来自所指定的局面集文件。"""
+        from pathlib import Path as _P
+        p = _P(self.ATTACK_FILE)
+        if not p.exists():
+            pytest.skip("cases_attack.json 尚未生成")
+        ids = {c.case_id for c in cases_mod.load(p)}
+        default_ids = {c.case_id for c in cases_mod.load()}
+        assert ids != default_ids, "两个局面集应有区别，否则本测试无意义"
+        assert cases_mod.describe(p) == "cases_attack.json"
+        assert cases_mod.describe() == "cases.json"
+
+    def test_argparse_default_is_none(self):
+        """`--cases-file` 默认应为 None（走默认集），而不是某个具体文件。"""
+        import inspect
+        src = inspect.getsource(run_mod.main)
+        assert '"--cases-file"' in src
+        # 默认值必须落在 `cases_mod.describe()` 能识别的 None 上
+        assert 'default=None' in src or "default=None" in src, \
+            "--cases-file 应默认 None，否则会静默指定某个局面集"
