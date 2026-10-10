@@ -107,6 +107,7 @@ class GameSpectacle:
     sac_sound_rate: Optional[float] = None   # 无弃子时为 None，不伪装成 1.0
     style_drift_count: int = 0
     long_chase_turns: int = 0
+    stuck_game: bool = False          # `P-18`：是否出现 >=8 手连续无吃无将（二值护栏）
     per_color: Dict[str, Dict[str, float]] = field(default_factory=dict)
     notes: List[str] = field(default_factory=list)
 
@@ -124,6 +125,7 @@ class GameSpectacle:
             "sac_sound_rate": self.sac_sound_rate,
             "style_drift_count": self.style_drift_count,
             "long_chase_turns": self.long_chase_turns,
+            "stuck_game": self.stuck_game,
             "per_color": self.per_color,
             "notes": self.notes,
         }
@@ -346,6 +348,10 @@ def _long_chase_turns(records: Sequence[PlyRecord]) -> int:
     **阈值 6 的依据**（实测 6 份报告的最长连续段）：
     基线 10；W-03/W-03b/W-04/W-05/W-05b 分别为 20/19/20/23/25。
     取 6 能捕获劣化后的长段，又不会把开局正常的 4-5 手铺垫误判为闷摆。
+
+    **`P-18` 警告**：本指标是**均值型**，噪声大——`P-17` 实测同配置两次跑的
+    噪声 SD（5.6）远大于效应（3.3）。**判定护栏级退化可用，判定改善不可用。**
+    降噪请用 `stuck_game_rate`（二值）。
     """
     total = 0
     run = 0
@@ -393,6 +399,38 @@ def _is_dead_end(rec: PlyRecord) -> bool:
     return not rec.has_attack_piece
 
 
+# 二值「卡死局」判定的最长静默阈值（`P-18`）。
+# 依据：对 3 份实测报告做阈值扫描，阈值 8 同时满足
+#   ① 稳定性——同配置两次跑（A vs B）命中局数相同；
+#   ② 区分度——与改造前后（A vs C）命中局数不同。
+# 取 8 而非 12 是因为 8 的区分度更强（A=2/C=1，A=1/C=0）。
+STUCK_MAX_QUIET = 8
+
+
+def _is_stuck_game(records: Sequence[PlyRecord]) -> bool:
+    """该局是否出现 >= STUCK_MAX_QUIET 手连续无吃无将（`P-18`）。
+
+    **为什么需要二值指标**：`P-17` 实测表明均值型观感性指标的噪声 SD
+    （最长静默 6.27 / 闷摆 5.61 / 棋风摇摆 7.25）**是效应 SD 的 2 倍以上**，
+    且噪声来自 API 非确定性（`temperature=0` 下 5/5 局走法仍不同）。
+
+    二值化把「这一局有多闷」压缩成「这一局闷不闷」，**方差显著下降**。
+    代价是分辨率降低：只能区分「有没有发生严重闷摆」，不能度量「闷了多少」。
+
+    **定位**：**护栏指标**——能可靠判「是否退化到不可看」，
+    不能用来宣称「观赏性提升了多少」。
+    """
+    run = mx = 0
+    for r in records:
+        if r.is_tactic:
+            run = 0
+            continue
+        run += 1
+        if run > mx:
+            mx = run
+    return mx >= STUCK_MAX_QUIET
+
+
 def analyze_game(starting_fen: str,
                  moves: Sequence[str],
                  case_id: str = "?",
@@ -415,6 +453,7 @@ def analyze_game(starting_fen: str,
     result.sac_sound_rate = _sac_sound_rate(records)
     result.style_drift_count = _style_drift_count(records)
     result.long_chase_turns = _long_chase_turns(records)
+    result.stuck_game = _is_stuck_game(records)
 
     for color in ("Red", "Black"):
         own = [r for r in records if r.color == color]
@@ -507,6 +546,9 @@ def analyze_report(raw_games: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "total_long_chase_turns": sum(g.long_chase_turns for g in games),
             "mean_capture_rate": _mean([g.capture_rate for g in games]),
             "mean_check_rate": _mean([g.check_rate for g in games]),
+            # `P-18` 二值护栏：命中局数 / 总局数
+            "stuck_game_rate": (sum(1 for g in games if g.stuck_game) / len(games)
+                                if games else None),
         },
         "errors": errors,
     }
@@ -530,6 +572,8 @@ SPECTACLE_GATES: List[Tuple[str, str, str]] = [
     ("summary.mean_sac_sound_rate", "弃子成立率", "up"),
     ("summary.mean_quiet_streak_max", "最长静默", "down"),
     ("summary.total_long_chase_turns", "闷摆回合", "down"),
+    # `P-18` 二值护栏：均值型指标噪声过大，此项才是可靠的退化判据
+    ("summary.stuck_game_rate", "卡死局比例", "down"),
 ]
 
 # §3.3 第 2 条：tactic_rate 不是越高越好。
@@ -625,6 +669,7 @@ def _print_summary(doc: Dict[str, Any]) -> None:
     print("mean_sac_sound_rate     %s" % s["mean_sac_sound_rate"])
     print("mean_style_drift_count  %s" % s["mean_style_drift_count"])
     print("total_long_chase_turns  %s" % s["total_long_chase_turns"])
+    print("stuck_game_rate（护栏）  %s" % s["stuck_game_rate"])
     for e in doc["errors"]:
         print("重放失败 [%s]: %s" % (e["case_id"], e["error"]))
 

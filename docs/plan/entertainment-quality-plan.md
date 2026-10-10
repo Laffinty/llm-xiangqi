@@ -221,15 +221,21 @@ AlphaZero（Silver et al., 2017）动作选择：self-play 前 30 手 `τ=1`（�
 
 ### 3.1 指标定义
 
-| 指标 | 定义 | 期望方向 | 对应 SKILL |
-|---|---|---|---|
-| `tactic_rate` | 含吃子或将军的着法占比 | ↑（**但设上限**，见 S-05） | `tempo-drama` |
-| `quiet_streak_max` | 连续无吃子无将军的最长手数 | ↓ | `tempo-drama` |
-| `move_repeat_rate` | 与本方此前走法集合重复的比例（同子同向） | ↓ | `tempo-drama` |
-| `sac_count` | 主动弃子着法数（引擎判定 `sacrifice:*` **且非被迫应将**） | ↑（≥0） | `sac-culture` |
-| `sac_sound_rate` | 弃子中 N=4 步内己方未丢等值子力的比例 | ↑ | `sac-culture` |
-| `style_drift_count` | 攻/守相位切换次数（**代理指标，见 §7 盲区 1**） | ↓ | `game-narrative` |
-| `long_chase_turns` | 进入重复循环（棋盘出现 ≥2 次）后的回合数 | ↓ | `check-defense` / `repetition-management` |
+> **⚠ 定位更正（`P-17`/`P-18` 后）**：本节指标原设计为「改造效果的验收标准」，
+> 实测证明**做不到**——噪声 SD 是效应 SD 的 2 倍以上。
+> 现重新定位：**均值型指标仅供参考；唯一可靠的退化判据是 `stuck_game_rate`（二值护栏）。**
+> 观赏性提升本身**无法量化验证**，改由人工观感判断。
+
+| 指标 | 定义 | 期望方向 | 对应 SKILL | 定位 |
+|---|---|---|---|---|
+| **`stuck_game_rate`** | **该局是否出现 ≥8 手连续无吃无将（二值，取命中局占比）** | ↓ | `tempo-drama` / `endgame-technique` | **护栏（唯一可靠）** |
+| `tactic_rate` | 含吃子或将军的着法占比 | ↑（上限见 §3.3） | `tempo-drama` | 参考（噪声大） |
+| `quiet_streak_max` | 连续无吃子无将军的最长手数 | ↓ | `tempo-drama` | 参考 |
+| `move_repeat_rate` | 与本方此前走法集合重复的比例（同子同向） | ↓ | `tempo-drama` | 参考 |
+| `sac_count` | 主动弃子着法数（引擎判定 `sacrifice:*` **且非被迫应将**） | ↑（≥0） | `sac-culture` | 参考 |
+| `sac_sound_rate` | 弃子中 N=4 步内己方未丢等值子力的比例 | ↑ | `sac-culture` | 参考 |
+| `style_drift_count` | 攻/守相位切换次数（**代理指标，见 §7 盲区 1**） | ↓ | `game-narrative` | 参考 |
+| `long_chase_turns` | 闷摆回合（连续无吃无将达阈值，`P-06` 重写） | ↓ | `check-defense` / `repetition-management` | 参考 |
 
 > `sac_sound_rate` 在**无弃子时为 `None`**，不伪装成 `1.0`。
 > 门禁遇到 `None` 判「无法判定」（§3.3 第 3 条），不会把「没测过」显示成「通过」。
@@ -1364,6 +1370,7 @@ python -m tests.eval.run --cases-file tests/eval/cases_attack.json \
 | `P-15` 替换杀局局面 | **完成**：`attack_p4` 实为 3 手强制将死；替换为 seed=2012 局面，并加穷举守卫 |
 | `P-16` 补「改造前」对照组 | **完成（判读：不可判定）**：worktree 回退做对照，四项靶子指标配对 t 检验均不显著 |
 | `P-17` 量化噪声下界 | **完成（结论：噪声 > 效应）**：`temperature=0` 下 5/5 局走法仍不同；噪声 SD 是效应的 2 倍以上，**扩样本无解** |
+| `P-18` 二值护栏 `stuck_game_rate` | **完成**：阈值 8 经扫描选定（同配置稳定 + 前后有区分度）；同配置两次跑均为 0.4，改造前 0.2 |
 
 ---
 

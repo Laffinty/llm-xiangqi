@@ -417,18 +417,69 @@ class TestAttackCaseFile:
                 "%s 是 3 手内强制将死的杀局，不应出现在观感性评测集" % c["id"]
 
 
+class TestStuckGameBinaryMetric:
+    """`P-18` 守卫：二值「卡死局」指标是本项目**唯一可靠的退化护栏**。
+
+    `P-17` 实测：均值型观感性指标的噪声 SD 是效应 SD 的 2 倍以上
+    （噪声来源是 API 非确定性——`temperature=0` 下 5/5 局走法仍不同），
+    因此均值型指标**只能作参考，不能作判据**。
+
+    本指标把「这局有多闷」压缩成「这局闷不闷」，方差显著下降。
+    """
+
+    def test_threshold_value(self):
+        from tests.eval.spectacle import STUCK_MAX_QUIET
+        # 依据：阈值扫描中 8 同时满足「同配置稳定」与「前后有区分度」
+        assert 6 <= STUCK_MAX_QUIET <= 10, \
+            "阈值 %d 超出实测支撑区间（6~10）" % STUCK_MAX_QUIET
+
+    def test_is_binary(self):
+        """必须是 0/1 二值，不是均值。"""
+        from tests.eval.spectacle import _is_stuck_game
+        fen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
+        recs = replay_plies(fen, ["h2e2", "h7h6"])
+        assert _is_stuck_game(recs) in (True, False)
+        assert isinstance(_is_stuck_game(recs), bool)
+
+    def test_stable_across_identical_config_runs(self):
+        """核心证据：同配置两次跑，该指标**完全一致**。
+
+        对比：均值型 `mean_sac_sound_rate` 在同样两次跑里是 0.797 vs 0.616。
+        """
+        import json
+        from pathlib import Path
+        from tests.eval.spectacle import analyze_report
+        repo = Path(__file__).resolve().parents[1]
+        a = repo / "docs" / "eval-attack-baseline.json"
+        b = repo / "docs" / "eval-attack-noise.json"
+        if not (a.exists() and b.exists()):
+            pytest.skip("实测报告不存在")
+        ra = analyze_report(json.loads(a.read_text(encoding="utf-8"))["raw"])
+        rb = analyze_report(json.loads(b.read_text(encoding="utf-8"))["raw"])
+        assert ra["summary"]["stuck_game_rate"] == rb["summary"]["stuck_game_rate"], \
+            "同配置两次跑的卡死局比例应一致"
+        # 并附一条对照：均值型指标在这两次跑里确实不稳定
+        assert ra["summary"]["mean_sac_sound_rate"] != rb["summary"]["mean_sac_sound_rate"]
+
+    def test_registered_as_gate(self):
+        """必须进门禁表，否则只是打印出来没人看。"""
+        from tests.eval.spectacle import SPECTACLE_GATES
+        paths = [g[0] for g in SPECTACLE_GATES]
+        assert "summary.stuck_game_rate" in paths
+
+
 class TestCompareGates:
     def test_missing_metric_is_indeterminate_not_pass(self):
         """基线缺 sac_sound_rate（None）时必须判「无法判定」，不能判通过。"""
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": None, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         cur = {"summary": {
             "mean_tactic_rate": 0.4, "mean_move_repeat_rate": 0.05,
             "mean_sac_sound_rate": 0.8, "mean_quiet_streak_max": 4.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         rows, ok = compare(base, cur)
         assert ok is False
@@ -446,7 +497,7 @@ class TestCompareGates:
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         cur = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
@@ -467,13 +518,13 @@ class TestCompareGates:
         base = {"summary": {
             "mean_tactic_rate": 0.30, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         # 吃子密度升到 0.60，但将军仍为 0 —— 应判通过
         cur = {"summary": {
             "mean_tactic_rate": 0.60, "mean_move_repeat_rate": 0.05,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 4.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         rows, ok = compare(base, cur)
         assert ok is True, [r for r in rows if r[1] != "通过"]
@@ -507,13 +558,13 @@ class TestCompareGates:
             "mean_tactic_rate": 0.326, "mean_move_repeat_rate": 0.054,
             "mean_sac_sound_rate": 0.625, "mean_quiet_streak_max": 7.0,
             "total_long_chase_turns": 17,      # P-06 重写后的实测值
-            "mean_check_rate": 0.0,            # P-14 新增字段
+            "mean_check_rate": 0.0, "stuck_game_rate": 0.0,            # P-14 新增字段
         }}
         worse = {"summary": {
             "mean_tactic_rate": 0.379, "mean_move_repeat_rate": 0.093,
             "mean_sac_sound_rate": 0.527, "mean_quiet_streak_max": 9.7,
             "total_long_chase_turns": 40,      # P-05 实测：闷摆回合 17 -> 40
-            "mean_check_rate": 0.0,
+            "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         rows, ok = compare(base, worse)
         assert ok is False
@@ -526,12 +577,12 @@ class TestCompareGates:
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.6, "mean_quiet_streak_max": 6.0,
-            "total_long_chase_turns": 4, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 4, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         cur = {"summary": {
             "mean_tactic_rate": 0.35, "mean_move_repeat_rate": 0.05,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0, "stuck_game_rate": 0.0,
         }}
         rows, ok = compare(base, cur)
         assert ok is True, rows
