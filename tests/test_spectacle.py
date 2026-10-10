@@ -370,6 +370,53 @@ class TestAttackCaseFile:
                 "%s 阶段应为 middlegame" % c["id"]
 
 
+    def test_no_forced_mate_within_3_plies(self):
+        """`P-15` 守卫：局面集里不得有「3 手内强制将死」的杀局。
+
+        原 `middlegame_attack_p4` 就是这样一个局面（红方穷举验证可在 3 手内
+        强制将死，黑方最优应对也逃不掉）。它只走 3 手，对均值影响显著——
+        剔除后 `sac_sound_rate` 从 0.492 变 0.616、`style_drift_count` 从
+        15.2 变 19.0。**杀局既无观赏性，又污染统计。**
+        """
+        from src.core.referee_engine import RefereeEngine
+        if not self.FILE.exists():
+            pytest.skip("cases_attack.json 尚未生成")
+        data = json.loads(self.FILE.read_text(encoding="utf-8"))
+
+        def red_mates_within(fen, depth):
+            def rec(engine, d, red_turn):
+                if d == 0:
+                    return False
+                if red_turn:
+                    for m in engine.get_legal_moves():
+                        e2 = RefereeEngine(engine.to_fen())
+                        try:
+                            e2.apply_move(m)
+                        except Exception:
+                            continue
+                        over, reason = e2.check_game_end()
+                        if over and "将死" in reason:
+                            return True
+                        if rec(e2, d - 1, False):
+                            return True
+                    return False
+                # 黑方只要有一手能逃脱，就不算强制
+                for m in engine.get_legal_moves():
+                    e2 = RefereeEngine(engine.to_fen())
+                    try:
+                        e2.apply_move(m)
+                    except Exception:
+                        continue
+                    if not rec(e2, d - 1, True):
+                        return False
+                return True
+            return rec(RefereeEngine(fen), depth, True)
+
+        for c in data["cases"]:
+            assert not red_mates_within(c["fen"], 3), \
+                "%s 是 3 手内强制将死的杀局，不应出现在观感性评测集" % c["id"]
+
+
 class TestCompareGates:
     def test_missing_metric_is_indeterminate_not_pass(self):
         """基线缺 sac_sound_rate（None）时必须判「无法判定」，不能判通过。"""

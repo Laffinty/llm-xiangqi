@@ -6,7 +6,8 @@
     "board_phase = middlegame",
     "双方进攻子力（车/马/炮/过河兵）各 >= 3",
     "合法着法数 >= 28（排除残局）",
-    "红方可选吃子+将军着法 >= 8（观赏潜力代理）"
+    "红方可选吃子+将军着法 >= 8（观赏潜力代理）",
+    "排除 3 手内强制将死（P-15）：杀局不具观赏性，且会污染均值"
   ],
   "_usage": "用 --cases-file tests/eval/cases_attack.json 选择；对比必须两侧同集",
   "cases": [
@@ -34,9 +35,9 @@
     {
       "id": "middlegame_attack_p4",
       "category": "middlegame",
-      "fen": "rnba1abn1/3kr4/9/p1p1p1p1p/3C5/4P4/P1P3P1P/7c1/3R5/RNBAKABN1 w - - 0 1",
-      "legal_moves": 42,
-      "note": "引擎实走生成；双方各 5 个进攻子力，9 个吃子/将军着法（30 子，42 个合法走法）"
+      "fen": "2ba1a1nr/4k4/2n2c2b/p1p1p1p1p/P8/8r/2P1P1P1P/RcN4C1/4A4/2B1KABNR w - - 0 1",
+      "legal_moves": 37,
+      "note": "引擎实走生成；双方各 6 个进攻子力，4 个吃子着法；已排除 3 手内强制将死（P-15）"
     },
     {
       "id": "middlegame_attack_p5",
