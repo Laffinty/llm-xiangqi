@@ -79,67 +79,43 @@ class TestRepetitionWarning:
     """测试重复警告标注"""
 
     def test_repetition_warning(self):
-        """测试走步会导致局面重复时有repetition_warning标注"""
-        # 红炮a1, 黑将f9, 红帅d0
-        fen = "5k3/9/9/9/9/9/9/9/C8/3K5 w - - 0 1"
+        """走这步会造成局面重复时，应带 repetition_warning 标注。
+
+        **改为走生产路径构造**（T-05）：旧写法手工 `position_history.append(sim_fen)`
+        两次，但生产代码判重读的是 `_position_counter`——两个存储各改各的，
+        测试测的是一条生产中不存在的路径。现在用真实往返走法让引擎自己记账。
+        """
+        fen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
         engine = RefereeEngine(fen)
-
-        # 红走 a1a2
-        engine.apply_move("a1a2")
-        # 黑走 f9e9
-        engine.apply_move("f9e9")
-        # 当前轮红方，炮在a2
-        # 手动把当前FEN加入position_history 2次
-        # 这样如果红走 a2a1 后FEN不匹配，我们需要让 a2a1 的模拟FEN在history中有>=2次
-        # a2a1 模拟后FEN = 4k4/9/9/9/9/9/9/9/C8/3K5 w - - 0 1 (炮回到a1, 黑将还在e9)
-        # 最简方案: 直接手动构造repetition_warning触发条件
-        # 把 a2a1 走后会产生的FEN加入history 2次
-        from src.core.referee_engine import Move
-        mv = Move.from_iccs("a2a1")
-        piece = engine.board.remove_piece(mv.from_pos)
-        target = engine.board.get_piece(mv.to_pos)
-        engine.board.set_piece(mv.to_pos, piece)
-        sim_fen = engine.to_fen()
-        engine.board.set_piece(mv.from_pos, piece)
-        engine.board.set_piece(mv.to_pos, target)
-
-        engine.position_history.append(sim_fen)
-        engine.position_history.append(sim_fen)
+        # 双车在 i 线往返：第一轮走完即回到起始局面，
+        # 于是第二轮的每一步都「会再次造成重复」。
+        for m in ["i0i1", "i9i8", "i1i0", "i8i9"]:
+            assert engine.validate_move(m), "夹具走法 %s 非法" % m
+            engine.apply_move(m)
 
         annotated = engine.get_annotated_moves()
-        a2a1 = [
-            m for m in annotated
-            if m["move"] == "a2a1" and "repetition_warning" in m["annotations"]
-        ]
-        assert len(a2a1) > 0
+        warned = [m["move"] for m in annotated
+                  if "repetition_warning" in m["annotations"]]
+        assert warned, "往返后回到曾出现过的局面，应标 repetition_warning"
 
     def test_repetition_warning_suppressed_when_check(self):
-        """将军走步不标repetition_warning"""
-        # 红车在e1，黑将在e9，中间无遮挡
-        # 构造局面使 e1e8 既是将军，模拟后FEN又在history中>=2次
+        """将军走步不标 repetition_warning（将军优先，避免噪声标签）"""
         fen = "4k4/9/9/9/9/9/9/9/4R4/4K4 w - - 0 1"
         engine = RefereeEngine(fen)
 
-        # 手动将 e1e8 模拟走后的FEN加入history 2次
-        from src.core.referee_engine import Move
-        mv = Move.from_iccs("e1e8")
-        piece = engine.board.remove_piece(mv.from_pos)
-        target = engine.board.get_piece(mv.to_pos)
-        engine.board.set_piece(mv.to_pos, piece)
-        sim_fen = engine.to_fen()
-        engine.board.set_piece(mv.from_pos, piece)
-        engine.board.set_piece(mv.to_pos, target)
-
-        engine.position_history.append(sim_fen)
-        engine.position_history.append(sim_fen)
+        # e1e8 既是将军，走完后的棋盘（红车到 e8）又确实已出现过——
+        # 通过**生产使用的** `_position_counter` 记账，而不是改 `position_history`
+        # （T-05：判重读的是前者，两者不是同一份数据）。
+        from src.core.referee_engine import _board_key
+        key = _board_key("4k3R/9/9/9/9/9/9/9/9/4K4 w - - 0 1")
+        engine._position_counter[key] = 1
 
         annotated = engine.get_annotated_moves()
         e1e8 = [m for m in annotated if m["move"] == "e1e8"]
         assert len(e1e8) == 1
-        # 应有 check 标注
         assert "check" in e1e8[0]["annotations"]
-        # 不应有 repetition_warning（将军时抑制）
-        assert "repetition_warning" not in e1e8[0]["annotations"]
+        assert "repetition_warning" not in e1e8[0]["annotations"], \
+            "将军时抑制 repetition_warning"
 
 
 class TestDevelopmentAnnotation:

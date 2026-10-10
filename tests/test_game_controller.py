@@ -94,23 +94,33 @@ class TestThreefoldRepetitionResult:
     """测试三次重复局面 → DRAW"""
 
     def test_threefold_repetition_via_engine(self):
-        """通过直接操控engine模拟三次重复局面"""
+        """通过真实走子走出三次重复局面。
+
+        **为什么不再手工注入 `position_history`**：旧写法注入 `fen + "_a"`
+        这类伪 FEN，其棋盘段与 `current_board` 对不上，命中的是
+        `_is_threefold_repetition` 里「计数器为 0 则回退到列表计数」的兜底分支。
+        `T-05` 修复后起始局面也进了计数器，兜底分支不再可达——该写法测的
+        是一条实际不会发生的路径。改为真走子，测的才是真实判和逻辑。
+        """
         engine = RefereeEngine()
-        fen = engine.current_fen
-        # _is_threefold_repetition() 需要 len >= 5 且当前FEN出现 >=3 次
-        engine.position_history = [fen, fen + "_a", fen, fen + "_b", fen]
+        # 双车在 i 线往返三次，初始局面出现 3 次
+        for m in ["i0i1", "i9i8", "i1i0", "i8i9"] * 3:
+            assert engine.validate_move(m), "夹具走法 %s 非法" % m
+            engine.apply_move(m)
         assert engine._is_threefold_repetition() is True
         is_over, reason = engine.check_game_end()
         assert is_over
         assert "判和" in reason
 
     def test_threefold_repetition_via_controller(self):
-        """通过Controller检查三次重复"""
+        """通过Controller检查三次重复（同样用真实走子构造）"""
         controller = GameController()
-        fen = controller.referee.current_fen
-        controller.referee.position_history = [fen, fen + "_a", fen, fen + "_b", fen]
+        for m in ["i0i1", "i9i8", "i1i0", "i8i9"] * 3:
+            assert controller.referee.validate_move(m), "夹具走法 %s 非法" % m
+            controller.referee.apply_move(m)
         is_over, reason = controller.referee.check_game_end()
         assert is_over
+        assert "判和" in reason
         assert "判和" in reason
 
     def test_threefold_result_is_draw(self):

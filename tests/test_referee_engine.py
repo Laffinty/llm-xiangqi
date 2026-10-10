@@ -324,10 +324,33 @@ class TestThreefoldRepetition:
         assert engine._is_threefold_repetition() == False
 
     def test_position_history_tracking(self):
-        """测试局面历史追踪"""
+        """局面历史追踪：走 1 手后应含**起始局面 + 走完后局面**共 2 条。
+
+        `T-05` 修复前 `position_history` 走 1 手后只有 1 条——起始局面从未入表，
+        导致重复判定永远晚一手才成立。本断言守住修复后的语义。
+        """
+        engine = RefereeEngine()
+        start = engine.current_fen
+        engine.apply_move("h2e2")
+        assert len(engine.position_history) == 2
+        assert engine.position_history[0] == start, "起始局面必须入表"
+        assert engine.position_history[-1] == engine.current_fen
+
+    def test_start_position_is_registered_on_construction(self):
+        """构造时起始局面即已入表（`_position_counter` 同步）。"""
+        from src.core.referee_engine import _board_key
+        engine = RefereeEngine()
+        assert engine.position_history == [engine.current_fen]
+        assert engine._position_counter[_board_key(engine.current_fen)] == 1
+
+    def test_reset_registers_start_position_consistently(self):
+        """`reset()` 必须与 `__init__` 同一口径——否则重开后重复判定重新失准。"""
+        from src.core.referee_engine import _board_key
         engine = RefereeEngine()
         engine.apply_move("h2e2")
-        assert len(engine.position_history) == 1
+        engine.reset()
+        assert engine.position_history == [engine.current_fen]
+        assert engine._position_counter[_board_key(engine.current_fen)] == 1
 
 
 class TestSpecialRules:

@@ -203,6 +203,16 @@ class Board:
         return new_board
 
 
+def _board_key(fen: str) -> str:
+    """取 FEN 的棋盘部分作为局面标识。
+
+    只比棋盘：走子方、回合数不影响「同一局面」的判定。
+    `apply_move` / `_is_threefold_repetition` / `__init__` 共用此函数，
+    **避免三处各写一份而出现口径不一致**（重复判定对不上，多半就出在这里）。
+    """
+    return fen.split()[0] if " " in fen else fen
+
+
 class RefereeEngine:
     """
     裁判引擎 - 绝对信任的裁判
@@ -218,12 +228,14 @@ class RefereeEngine:
         self.move_history: List[str] = []
         self.board = Board()
         self._parse_fen(fen)
-        # 位置历史（FEN列表）
-        self.position_history: List[str] = []
+        # 位置历史（FEN列表）。**起始局面必须入表**（T-05）：
+        # 否则「某局面出现第二次」永远晚一手才成立，repetition_warning 因此失准，
+        # 且第一手之后的 `board_snapshot._last_move_detail` 取不到上一步局面。
+        self.position_history: List[str] = [fen]
         # 将军历史（记录每回合是否将军）
         self.check_history: List[bool] = []
-        # 位置计数器（用于快速检测重复局面）
-        self._position_counter: Dict[str, int] = {}
+        # 位置计数器（用于快速检测重复局面）。与 position_history 同源，必须一并登记。
+        self._position_counter: Dict[str, int] = {_board_key(fen): 1}
 
     def _validate_fen_format(self, fen: str) -> None:
         """验证FEN字符串的基本格式
@@ -459,7 +471,14 @@ class RefereeEngine:
                 annotations.append("check")
 
             temp_fen = self.to_fen()
-            if self.position_history.count(temp_fen) >= 2:
+            # 判重必须按**棋盘段**比较（T-05）：
+            # 此处 `to_fen()` 是在**走子方尚未切换**时模拟出来的，其 side 字段
+            # 是「走这步之前那一方」；而 `position_history` 里存的是
+            # `apply_move` 中切换走子方**之后**的 FEN。两者 side 永远相反，
+            # 因此用完整 FEN 比较恒不成立——repetition_warning 从不触发。
+            # 棋盘段不含 side，两边一致，故这是唯一可比的口径
+            # （与 `_is_threefold_repetition` 同样按棋盘段判定）。
+            if self._position_counter.get(_board_key(temp_fen), 0) >= 1:
                 if "check" not in annotations:
                     annotations.append("repetition_warning")
 
@@ -874,9 +893,7 @@ class RefereeEngine:
         self.position_history.append(self.current_fen)
 
         # 更新位置计数器（只比较棋盘部分）
-        board_key = (
-            self.current_fen.split()[0] if " " in self.current_fen else self.current_fen
-        )
+        board_key = _board_key(self.current_fen)
         self._position_counter[board_key] = self._position_counter.get(board_key, 0) + 1
 
         after_check = self.is_king_in_check(self.board.current_color.opposite())
@@ -922,9 +939,7 @@ class RefereeEngine:
         if len(self.position_history) < 5:
             return False
 
-        current_board = (
-            self.current_fen.split()[0] if " " in self.current_fen else self.current_fen
-        )
+        current_board = _board_key(self.current_fen)
 
         # 优先使用位置计数器快速检查
         count = self._position_counter.get(current_board, 0)
@@ -1180,14 +1195,18 @@ class RefereeEngine:
         }
 
     def reset(self, fen: str = INITIAL_FEN) -> None:
-        """重置游戏到初始状态"""
+        """重置游戏到初始状态
+
+        起始局面入表，与 `__init__` 保持同一口径（T-05）——
+        两条路径必须一致，否则 reset 后的重复判定会重新失准。
+        """
         self.current_fen = fen
         self.move_history = []
         self.board = Board()
         self._parse_fen(fen)
-        self.position_history = []
+        self.position_history = [fen]
         self.check_history = []
-        self._position_counter = {}
+        self._position_counter = {_board_key(fen): 1}
 
 
 # 示例用法

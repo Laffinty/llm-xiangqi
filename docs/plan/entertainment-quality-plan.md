@@ -472,25 +472,46 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 `
 
 `E-03` 已核实字段存在且完整。基线 `aborted: true` 的对局需排除或截断到合法前缀。
 
-### T-05 `repetition_warning` 永远迟到一手 —— `开放`（`P-03` 发现）
+### T-05 `repetition_warning` 永不触发 —— `已消解`（2026-10-10 修复）
 
-**根因**：`referee_engine.py:874` 的 `position_history` 只在走子**之后**追加，
-起始局面从不入表（`__init__` 与 `reset()` 都初始化为 `[]`）。因此
-「某棋盘出现第二次」这一判定**永远晚一手**才成立。
+**症状**：`repetition_management` 这个 SKILL 在实测的 40 手残局里**一次都没激活过**。
 
-**后果**：`repetition-management` 这个 SKILL 在实测的 40 手残局里
-**一次都没激活过**——它的激活信号本身是坏的。这解释了为什么 §3.4 实测的长打
-能持续到 28 手而无任何 SKILL 介入。
+**根因有两处，两处都独立致命**（`P-03` 开工时只想到第一处，实际是第二处才让它完全不触发）：
 
-**这是 `src/` 缺陷，与归档 `optimization-plan.md` P1-2 同族。**
-修它需要把起始局面预先登记进 `position_history`（`__init__` 与 `reset()` 各加一行），
-**超出本轮非目标，故未改**。
+1. **起始局面从未入表**（`__init__` / `reset()` 均初始化为 `[]`）——
+   「某局面出现第二次」永远晚一手才成立。与归档 `optimization-plan.md` P1-2 同族。
+2. **`_annotate_move` 用完整 FEN 比较** —— 该处 `to_fen()` 是在**走子方尚未切换**时
+   模拟的，side 字段是「走这步之前那一方」；而 `position_history` 存的是 `apply_move`
+   切换**之后**的 FEN。**两者 side 恒相反**，完整 FEN 永远匹配不上。
 
-**已在 P-03 内绕过**：SKILL 改用不依赖报警的**提前判据**（「连续两手无吃无将」），
-这是当前不动引擎也能生效的唯一手段。
+**修复**（`src/core/referee_engine.py`）：
 
-**修复优先级建议**：高于 `P-02`。理由是修引擎能让既有 SKILL 真正开始工作，
-而不修则新 SKILL 会重蹈「激活信号不可靠」的老路。已记入 §10 第 5 条。
+| 改动 | 位置 |
+|---|---|
+| 新增模块级 `_board_key()`，统一棋盘段提取 | 文件头 |
+| `__init__` / `reset()` 登记起始局面（`position_history` + `_position_counter`） | 两处 |
+| `_annotate_move` 改按棋盘段 + `_position_counter` 判定 | 标注逻辑 |
+| `apply_move` / `_is_threefold_repetition` 改用统一的 `_board_key` | 去重内联写法 |
+
+**实测效果**（`tests/test_repetition_signal.py`，11 项守卫）：
+
+- 开局 0 误报；往返序列第 3 手起正确预警。
+- `board_snapshot.repetition_warning` 与走步标注**口径完全一致**（同手同步触发）。
+- 出现 3 次仍正确判和（`_is_threefold_repetition` 未被改坏）。
+- **连带修好** `last_move_detail`：第 1 手之后不再退化（此前取不到上一步局面）。
+
+**口径阶梯**（三者现已自洽）：
+
+| 判据 | 阈值 | 动作 |
+|---|---|---|
+| `_annotate_move` | 棋盘出现 2 次 | `repetition_warning` 标注 |
+| `board_snapshot` | 棋盘出现 2 次 | 激活 `repetition-management` |
+| `_is_threefold_repetition` | 棋盘出现 3 次 | 判和 |
+
+**同步修正的测试**：原 `test_annotated_moves` 两处与
+`test_game_controller` 三处**手工注入 `fen + "_a"` 伪 FEN**，命中的是
+「计数器为 0 则回退到列表计数」的兜底分支——修复后该分支不再可达。
+已改为走真实走法构造（这是它本来想测的东西）。
 
 ---
 
@@ -556,9 +577,11 @@ python -m tests.eval.run --games 7 --seed 42 --max-turns 40 `
    落地后从 `0` 升至 `34 / 37`。若认可，`P-03` 的优先级应高于 `P-02`——
    长打正在让已完成的改造**倒退**，而新增 SKILL 只是增量改善。
    **已执行**：`P-03` 已完成，且诊断修正为「闷摆」（见 §4 `P-03`）。
-5. **（新增）是否解冻 `T-05`（改 `src/` 修 `position_history`）** ——
-   实测 `repetition_warning` 在 40 手残局中**一次都没触发**，该 SKILL 从未激活。
-   修复只需在 `__init__` / `reset()` 各加一行登记起始局面。
-   **建议解冻并优先做**：理由是修它能让既有 SKILL 真正开始工作，
-   而 `P-02` 新增的 SKILL 若建立在同一个坏信号上，会重蹈覆辙。
-   不解冻则 `P-02` 的三个 SKILL 都只能用「不依赖快照的提前判据」写法。
+5. ~~**是否解冻 `T-05`**~~ —— **已解冻并修复**（见 §5 `T-05`）。
+   根因实为两处（起始局面未入表 + 判重口径用完整 FEN 而 side 恒相反），
+   现已统一到棋盘段口径，`board_snapshot` 与走步标注同步。
+6. **（新增）`P-02` 的三个新 SKILL 是否继续按原计划落地** ——
+   `T-05` 修复后激活信号已可信，建议照原计划执行；
+   但请注意 `P-04`（棋风由 config 指定具体类型）**仍挂起**，
+   在它落地前 `game-narrative` 只能约束「锁定一种」，**无法让红黑两方用不同棋风**，
+   因此 §7 盲区 1 仍未消除。
