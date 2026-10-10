@@ -55,6 +55,10 @@ PIECE_VALUE: Dict[str, float] = {
 # 与 §7 盲区 2 一致——这是粗糙代理，不是引擎认可。
 SAC_LOOKAHEAD_PLIES = 4
 
+# 闷摆段的最小长度（`P-06`）。连续无吃无将达到此长度即计入闷摆回合。
+# 依据：实测 6 份报告的最长连续段为 10/20/19/20/23/25，取 6 留出余量。
+CHURN_MIN_RUN = 6
+
 
 @dataclass(frozen=True)
 class PlyRecord:
@@ -296,22 +300,31 @@ def _style_drift_count(records: Sequence[PlyRecord]) -> int:
 
 
 def _long_chase_turns(records: Sequence[PlyRecord]) -> int:
-    """进入重复/长打循环的回合数。
+    """**闷摆回合数**：连续无吃无将且长度达阈值的手数合计（`P-06` 重写）。
 
-    判定：同一棋盘局面**出现第二次**即视为进入循环（与引擎
-    `_annotate_move` 的 `repetition_warning` 同阈值：count >= 2），
-    从那一刻起算到局末。返回 0 表示全程无循环。
+    **为什么重写**：旧定义以「棋盘出现第 2 次」判重复。
+    `P-05` 实测发现它在无限搬运中**永远测不准**——搬运时棋盘不断微变，
+    27 手搬运的 27 个棋盘全不相同，被判成「长打 27 回合」，
+    而真正该测的「闷摆」反而漏掉。
+
+    **新定义**：把每一段「连续无吃无将」中**长度 >= CHURN_MIN_RUN 的部分**
+    累加。这直接对应 doctrine 的判据（`repetition-management` /
+    `middlegame-tactics`：「连续两手无吃无将即已在闷摆」），指标与条文同源。
+
+    **阈值 6 的依据**（实测 6 份报告的最长连续段）：
+    基线 10；W-03/W-03b/W-04/W-05/W-05b 分别为 20/19/20/23/25。
+    取 6 能捕获劣化后的长段，又不会把开局正常的 4-5 手铺垫误判为闷摆。
     """
-    seen: Dict[str, int] = {}
-    chase_start: Optional[int] = None
+    total = 0
+    run = 0
     for r in records:
-        key = r.board_key
-        seen[key] = seen.get(key, 0) + 1
-        if seen[key] >= 2 and chase_start is None:
-            chase_start = r.index
-    if chase_start is None:
-        return 0
-    return len(records) - chase_start
+        if r.is_tactic:
+            run = 0
+            continue
+        run += 1
+        if run >= CHURN_MIN_RUN:
+            total += 1
+    return total
 
 
 def analyze_game(starting_fen: str,
@@ -355,9 +368,20 @@ def analyze_game(starting_fen: str,
         }
 
     if result.long_chase_turns:
+        # 找第一段闷摆的起点，只为提示文案定位；计数由 _long_chase_turns 负责
+        first = None
+        run = 0
+        for r in records:
+            if r.is_tactic:
+                run = 0
+                continue
+            run += 1
+            if run >= CHURN_MIN_RUN and first is None:
+                first = r.index - run + 1
         result.notes.append(
-            "第 %d 手起进入重复局面循环，共 %d 手"
-            % (len(records) - result.long_chase_turns, result.long_chase_turns))
+            "第 %s 手起出现闷摆（连续无吃无将 ≥%d 手），全程累计 %d 手"
+            % (first if first is not None else "?", CHURN_MIN_RUN,
+               result.long_chase_turns))
     if result.tactic_rate > 0.45:
         result.notes.append(
             "tactic_rate=%.3f 超过 0.45：疑似互将军形成噪音，非「更精彩」"
@@ -431,7 +455,7 @@ SPECTACLE_GATES: List[Tuple[str, str, str]] = [
     ("summary.mean_move_repeat_rate", "走法重复率", "down"),
     ("summary.mean_sac_sound_rate", "弃子成立率", "up"),
     ("summary.mean_quiet_streak_max", "最长静默", "down"),
-    ("summary.total_long_chase_turns", "长打回合", "down"),
+    ("summary.total_long_chase_turns", "闷摆回合", "down"),
 ]
 
 # §3.3 第 2 条：tactic_rate 不是越高越好，超过上限判「过火」。
@@ -500,7 +524,7 @@ def _print_summary(doc: Dict[str, Any]) -> None:
             g["sac_count"],
             "n/a" if g["sac_sound_rate"] is None else "%.2f" % g["sac_sound_rate"]))
         print("  棋风摇摆      %d 次" % g["style_drift_count"])
-        print("  长打回合      %d" % g["long_chase_turns"])
+        print("  闷摆回合      %d" % g["long_chase_turns"])
         for note in g["notes"]:
             print("  ! %s" % note)
     print("")

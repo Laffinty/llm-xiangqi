@@ -143,7 +143,7 @@ class TestMiddlegameContent:
         ("战术密度", "节奏判据必须可量化，否则退化为玄学"),
         ("0.30~0.34", "实测分布区间，给模型可参照的目标带"),
         ("弃子", "观赏性的主要来源"),
-        ("须成立", "弃子三判据之一——防无脑送子"),
+        ("须说得出收益", "P-08 硬约束：弃后 4 手内必须能指出得子点或位置收益"),
         ("须有选择", "弃子三判据之一——被迫弃子不算"),
     ])
     def test_contains(self, keyword, why):
@@ -156,6 +156,36 @@ class TestMiddlegameContent:
             str(SKILLS / "middlegame-tactics"), "references"))
         assert "move-values.md" in refs
         assert "sac-motifs.md" in refs, "弃子图式 references 应随合并一并保留"
+
+
+class TestEndgameContent:
+    """`P-07` 守卫：残局必须有闷摆条文。
+
+    `P-05` 实测：两局残局的中局 doctrine 覆盖率 **0%**，而 27 手闷摆恰好
+    全发生在残局——规则根本没送到模型面前。本类锁住这一缺口不再复发。
+    """
+
+    @pytest.mark.parametrize("keyword,why", [
+        ("闷摆", "残局是闷摆重灾区，实测有 27 手无吃无将搬运"),
+        ("进兵提速", "残局提速手段——推进本身即内容"),
+        ("残局禁弃子", "残局子力精确，弃子与中局策略相反"),
+        ("兑、献、拦、跟", "允许着法——残局求和的正路"),
+        ("立即判负", "单方长将判负，不能靠长将求和"),
+    ])
+    def test_contains(self, keyword, why):
+        assert keyword in body("endgame-technique"), \
+            "endgame-technique 丢失了「%s」——%s" % (keyword, why)
+
+    def test_no_wrong_draw_advice(self):
+        """回归守卫：不得建议「靠制造重复局面求和」。
+
+        单方长将**立即判负**，而长打多为禁止着法；旧文案
+        「制造对方无法回避的重复局面」会让模型走进判负。
+        """
+        text = body("endgame-technique")
+        assert "制造对方无法回避的重复局面" not in text, \
+            "「靠重复局面求和」是规则性错误"
+        assert "兑、献、拦、跟" in text
 
 
 class TestSpectacleMetricsRemainReachable:

@@ -129,10 +129,12 @@ class TestMetricSemantics:
         assert g.sac_sound_rate is None
 
     def test_long_chase_zero_when_no_repetition(self):
-        """全程无重复局面时 long_chase_turns 必须为 0。
+        """短局无闷摆时 long_chase_turns 必须为 0。
 
-        走法是**引擎验证过的**合法推进序列（红马出屏风马 + 兵过河）。
-        注意不能凭印象写：兵卒不可后退、车在 `i0` 而 `h0` 是马（`i0h0` 非法）。
+        `P-06` 起该指标测的是**连续无吃无将的累积长度**（旧定义测棋盘重复，
+        在无限搬运中永远测不准）。本例 7 手全无吃无将，但不足 `CHURN_MIN_RUN`
+        (6) 的**完整**段——第 7 手时累计 7 ≥ 6，故记 2 手，属预期行为：
+        指标定义是「达到阈值后的每一手都计入」，不是「整段都计入」。
         """
         fen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
         moves = _moves_from_movelist("b0c2 b9c7 c3c4 h7h6 i0i1 i9i8 e3e4")
@@ -142,25 +144,72 @@ class TestMetricSemantics:
             engine.apply_move(m)
         g = analyze_game(fen, moves, case_id="t", category="test")
         assert g.plies == 7
-        assert g.long_chase_turns == 0
+        assert g.long_chase_turns == 2, (
+            "7 手连续无吃无将，第 6、7 手达阈值 → 应为 2")
 
-    def test_long_chase_detects_repetition(self):
-        """往返搬运同子应被检出为重复局面循环。
+    def test_long_chase_detects_churn(self):
+        """真正**无吃无将的搬运**应被判为闷摆（`P-06` 的目标场景）。
 
-        用**双车在 i 线往返**（i0↔i1 / i9↔i8）——引擎实测该序列 4 个棋盘各出现 2 次，
-        是 `long_chase_turns` 的最小可复现样本。
+        旧实现用「棋盘重复」判定，**这类搬运永远测不出来**——
+        `P-05` 实测的 27 手搬运 27 个棋盘全不相同。
         """
         fen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
         moves = _moves_from_movelist(
-            "i0i1 i9i8 i1i0 i8i9 i0i1 i9i8 i1i0 i8i9")
+            "i0i1 i9i8 i1i0 i8i9 i0i1 i9i8 i1i0 i8i9 i0i1 i9i8")
         engine = RefereeEngine(fen)
         for m in moves:
             assert engine.validate_move(m), "夹具走法 %s 非法" % m
             engine.apply_move(m)
         g = analyze_game(fen, moves, case_id="t", category="test")
-        assert g.plies == 8
-        assert g.long_chase_turns > 0
-        assert any("循环" in n for n in g.notes)
+        assert g.plies == 10
+        # 计数规则：达到阈值（第 6 手）之后的每一手都计入 → 第 6..10 手 = 5 手
+        assert g.long_chase_turns == 5, "10 手全无吃无将，第 6-10 手达阈值 → 5 手"
+        assert any("闷摆" in n for n in g.notes)
+
+    def test_tactical_moves_break_the_churn_run(self):
+        """吃子/将军应**打断**闷摆累积——这是新定义的核心。
+
+        若不打断，中局里一次吃子之后的搬运会与吃子前的搬运混算，
+        指标就退化成「整局无吃无将数」，失去分辨力。
+
+        夹具取自 `docs/eval-after-spectacle.json` 的**真实对局走法**
+        （`endgame_m14_p059` 前 4 手，第 4 手为吃子），
+        不凭印象编棋谱。
+        """
+        import json
+        from pathlib import Path
+        base = Path(__file__).resolve().parents[1] / "docs" / "eval-after-spectacle.json"
+        if not base.exists():
+            pytest.skip("实测报告不存在")
+        doc = json.loads(base.read_text(encoding="utf-8"))
+        game = next(g for g in doc["raw"] if g["case_id"] == "endgame_m14_p059")
+        full = game["move_history"]
+
+        # 该局第 3 手是吃卒（第 1、2 手非战术），引擎实测确认
+        recs = replay_plies(game["starting_fen"], full[:3])
+        assert recs[-1].captured_piece == "pawn", "第 3 手是吃卒（引擎实测）"
+        assert not recs[-2].is_tactic
+
+        # 关键：取「吃子之后」的一段，看它的闷摆计数从哪一手开始。
+        # 若吃子**不打断**累积，则这段会从第 1 手就计入；正确实现应归零重来。
+        after = analyze_game(game["starting_fen"], full[:8],
+                             case_id="t", category="test")
+        recs8 = replay_plies(game["starting_fen"], full[:8])
+        # 手工按定义复算：达到 CHURN_MIN_RUN 的那一手起计入
+        from tests.eval.spectacle import CHURN_MIN_RUN
+        run = 0
+        expect = 0
+        for r in recs8:
+            if r.is_tactic:
+                run = 0
+                continue
+            run += 1
+            if run >= CHURN_MIN_RUN:
+                expect += 1
+        assert after.long_chase_turns == expect
+        # 该局第 3 手吃子 -> 第 4 手起重新计数，到第 8 手只有 5 手，不足 6
+        assert after.long_chase_turns == 0, (
+            "吃子打断了累积：吃子后仅 5 手搬运，未达阈值 6")
 
 
 class TestCompareGates:
@@ -222,18 +271,18 @@ class TestCompareGates:
         """
         base = {"summary": {
             "mean_tactic_rate": 0.326, "mean_move_repeat_rate": 0.054,
-            "mean_sac_sound_rate": 0.63, "mean_quiet_streak_max": 7.0,
-            "total_long_chase_turns": 0,
+            "mean_sac_sound_rate": 0.625, "mean_quiet_streak_max": 7.0,
+            "total_long_chase_turns": 17,      # P-06 重写后的实测值
         }}
         worse = {"summary": {
-            "mean_tactic_rate": 0.331, "mean_move_repeat_rate": 0.074,
-            "mean_sac_sound_rate": 0.63, "mean_quiet_streak_max": 9.6,
-            "total_long_chase_turns": 37,
+            "mean_tactic_rate": 0.379, "mean_move_repeat_rate": 0.093,
+            "mean_sac_sound_rate": 0.527, "mean_quiet_streak_max": 9.7,
+            "total_long_chase_turns": 40,      # P-05 实测：闷摆回合 17 -> 40
         }}
         rows, ok = compare(base, worse)
         assert ok is False
-        chase_row = [r for r in rows if r[0] == "长打回合"][0]
-        assert chase_row[1] == "退化"
+        churn_row = [r for r in rows if r[0] == "闷摆回合"][0]
+        assert churn_row[1] == "退化"
         quiet_row = [r for r in rows if r[0] == "最长静默"][0]
         assert quiet_row[1] == "退化"
 
