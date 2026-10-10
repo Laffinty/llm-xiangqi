@@ -1,0 +1,49 @@
+{
+  "_note": "PLAN-SPECTACLE-001 P-11 新增：子力充足、双方均有进攻手段的中局局面",
+  "_purpose": "现有 cases.json 中的残局局面经 P-10 实测确认**无可进攻子力**（红方仅剩相仕，无车马炮、无过河兵），闷摆指标在其上结构性不可归因。本文件提供「双方都有进攻子力」的中局局面，使闷摆/战术密度指标真正可测。生成方式与 cases.json 相同：引擎实走，**禁止手改**。",
+  "_criteria": [
+    "红方走棋（GameController 硬编码 phase=RED_TO_MOVE）",
+    "board_phase = middlegame",
+    "双方进攻子力（车/马/炮/过河兵）各 >= 3",
+    "合法着法数 >= 28（排除残局）",
+    "红方可选吃子+将军着法 >= 8（观赏潜力代理）"
+  ],
+  "_usage": "用 --cases-file tests/eval/cases_attack.json 选择；对比必须两侧同集",
+  "cases": [
+    {
+      "id": "middlegame_attack_p1",
+      "category": "middlegame",
+      "fen": "r1b1kab1C/2R6/n2a3c1/p3p1pRr/8p/2p6/PCP1P1P1P/6N2/4K4/2BA1AB2 w - - 0 1",
+      "legal_moves": 51,
+      "note": "引擎实走生成；双方各 5 个进攻子力，红方 10 个吃子/将军着法可选（29 子，51 个合法走法）"
+    },
+    {
+      "id": "middlegame_attack_p2",
+      "category": "middlegame",
+      "fen": "r1ba1abn1/3k3r1/n1c6/p1p1C1p1p/9/4c4/P1P1P1P1P/N2C2N2/3RA4/2BAK1B1R w - - 0 1",
+      "legal_moves": 37,
+      "note": "引擎实走生成；双方各 6 个进攻子力，9 个吃子/将军着法（31 子，37 个合法走法）"
+    },
+    {
+      "id": "middlegame_attack_p3",
+      "category": "middlegame",
+      "fen": "r1b1kab2/1C7/n4ac1n/p3p1p2/2p2R2p/2P3r1P/P3P1P2/R2cC3N/4K4/1NBA1AB2 w - - 0 1",
+      "legal_moves": 49,
+      "note": "引擎实走生成；双方各 6 个进攻子力，9 个吃子/将军着法（32 子，49 个合法走法）"
+    },
+    {
+      "id": "middlegame_attack_p4",
+      "category": "middlegame",
+      "fen": "rnba1abn1/3kr4/9/p1p1p1p1p/3C5/4P4/P1P3P1P/7c1/3R5/RNBAKABN1 w - - 0 1",
+      "legal_moves": 42,
+      "note": "引擎实走生成；双方各 5 个进攻子力，9 个吃子/将军着法（30 子，42 个合法走法）"
+    },
+    {
+      "id": "middlegame_attack_p5",
+      "category": "middlegame",
+      "fen": "3akab2/1rC1r4/1R2b3n/p1p5p/4p1p1P/9/P1P1P1P2/B3B3c/3c2C2/1N1AKA1NR w - - 0 1",
+      "legal_moves": 42,
+      "note": "引擎实走生成；红方 7 / 黑方 5 进攻子力，8 个吃子/将军着法（31 子，42 个合法走法）"
+    }
+  ]
+}

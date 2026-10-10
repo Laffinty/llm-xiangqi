@@ -77,6 +77,18 @@ python -m tests.eval.run --probe --api-file <路径>
 |---|---|---|
 | `tests/eval/cases.json` | 引擎实走生成的**冻结集** | 所有已有基线用它，作为对比的控制变量 |
 | `tests/eval/cases_real.json` | 2026-10-10 真实对局（13 手红方将死胜） | 更贴近真实分布；用 `--cases-file` 选择 |
+| `tests/eval/cases_attack.json` | **双方均有进攻子力**的中局（`P-11`，2026-10-10） | 观赏性指标专用；见下 |
+
+**`cases_attack.json` 为什么单独存在**：`PLAN-SPECTACLE-001` `P-10` 实测确认，
+`cases.json` 的两个残局局面**红方无车马炮、无过河兵**——「进兵提速 / 主动兑子 /
+制造接触」等换法在那种局面里**结构性不适用**，闷摆指标在其上不可归因。
+该文件提供 5 个 `middlegame` 局面，筛选条件：红方走棋、双方进攻子力各 ≥ 3、
+合法着法 ≥ 28、红方可选吃子+将军 ≥ 8。生成方式与 `cases.json` 相同
+（引擎实走，**禁止手改**）。用它跑观赏性 A/B：
+
+```bash
+python -m tests.eval.run --cases-file tests/eval/cases_attack.json --games 5 --seed 42 ...
+```
 
 **`--compare` 必须两侧用同一套局面集**，否则差异无法归因。报告的 `meta.cases_file`
 会记录实际使用的那套。

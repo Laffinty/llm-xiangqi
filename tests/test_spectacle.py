@@ -10,6 +10,7 @@
 """
 from pathlib import Path
 
+import json
 import pytest
 
 from src.core.referee_engine import RefereeEngine
@@ -229,6 +230,27 @@ class TestDeadEndExemption:
         assert set(NO_ATTACK_PIECES) == {"rook", "knight", "cannon"}, \
             "进攻子力应含车/马/炮"
 
+    def test_attack_piece_is_the_only_exemption_reason(self):
+        """`P-12`：判据收敛为**只有**「无进攻子力」才豁免。
+
+        旧版附带「合法着法数 < 5」，实测在 `eval-after-w03` 的
+        `middlegame_p41` 上误伤 8 手——该局全程有进攻子力，
+        只是某些局面着法偏少。此断言防止该误伤复发。
+        """
+        import json
+        from pathlib import Path
+        from tests.eval.spectacle import _is_dead_end
+        base = Path(__file__).resolve().parents[1] / "docs" / "eval-after-w03.json"
+        if not base.exists():
+            pytest.skip("历史报告不存在")
+        doc = json.loads(base.read_text(encoding="utf-8"))
+        game = next(g for g in doc["raw"] if g["case_id"] == "middlegame_p41")
+        recs = replay_plies(game["starting_fen"], game["move_history"])
+        assert all(r.has_attack_piece for r in recs), \
+            "该局全程有进攻子力"
+        assert not any(_is_dead_end(r) for r in recs), \
+            "有进攻子力就不得豁免（着法数少不再是豁免理由）"
+
     def test_openings_have_attack_pieces(self):
         """开局双方都应判定为「有进攻子力」——否则豁免会误伤正常对局。"""
         from tests.eval.spectacle import _is_dead_end
@@ -293,6 +315,59 @@ class TestDeadEndExemption:
             if run >= CHURN_MIN_RUN:
                 no_exempt += 1
         assert got < no_exempt, "死局豁免未生效"
+
+
+class TestAttackCaseFile:
+    """`P-11` 守卫：新局面集必须保持「双方都有进攻子力」。
+
+    `P-10` 实测确认旧 `cases.json` 的两个残局**红方无车马炮、无过河兵**，
+    闷摆指标在其上结构性不可归因。`cases_attack.json` 就是为此而生——
+    若日后有人往里塞死局局面，这个集子就失去意义，故加断言。
+    """
+
+    FILE = Path(__file__).resolve().parents[1] / "tests" / "eval" / "cases_attack.json"
+
+    def test_file_exists_and_loads(self):
+        if not self.FILE.exists():
+            pytest.skip("cases_attack.json 尚未生成")
+        from tests.eval.cases import load
+        cases = load(self.FILE)          # load() 内部已用 RefereeEngine 复验
+        assert cases, "局面集不应为空"
+
+    def test_all_positions_have_attack_pieces(self):
+        if not self.FILE.exists():
+            pytest.skip("cases_attack.json 尚未生成")
+        from src.core.referee_engine import RefereeEngine
+        from tests.eval.spectacle import NO_ATTACK_PIECES, PieceType, Color
+        data = json.loads(self.FILE.read_text(encoding="utf-8"))
+        for c in data["cases"]:
+            e = RefereeEngine(c["fen"])
+            for color in (Color.RED, Color.BLACK):
+                n = 0
+                for r in range(10):
+                    for cc in range(9):
+                        p = e.board.grid[r][cc]
+                        if not p or p.color != color:
+                            continue
+                        if p.piece_type.value in NO_ATTACK_PIECES:
+                            n += 1
+                        elif p.piece_type == PieceType.PAWN:
+                            crossed = (r >= 5) if color == Color.RED else (r <= 4)
+                            if crossed:
+                                n += 1
+                assert n >= 3, "%s: %s方进攻子力仅 %d 个，本集子失去意义" % (
+                    c["id"], "红" if color == Color.RED else "黑", n)
+
+    def test_all_positions_are_middlegame(self):
+        if not self.FILE.exists():
+            pytest.skip("cases_attack.json 尚未生成")
+        from src.core.board_snapshot import build
+        from src.core.referee_engine import RefereeEngine
+        data = json.loads(self.FILE.read_text(encoding="utf-8"))
+        for c in data["cases"]:
+            e = RefereeEngine(c["fen"])
+            assert build(e)["board_phase"] == "middlegame", \
+                "%s 阶段应为 middlegame" % c["id"]
 
 
 class TestCompareGates:

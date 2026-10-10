@@ -361,6 +361,10 @@ def _long_chase_turns(records: Sequence[PlyRecord]) -> int:
 
 # 走子方合法着法数低于此值即视为「死局」，闷摆不可归因于 doctrine（`P-09`）。
 # 依据实测：正常残局仍有 5-9 个着法可选，而死局局面低至 1-4 个。
+# **已废弃**（`P-12`）：原想用「合法着法数 < 5」作为死局辅助判据，
+# 实测在 `eval-after-w03` 的 `middlegame_p41` 上误伤 8 手
+# （该局全程有进攻子力，只是某些局面着法偏少）。
+# 判据已收敛为「有无进攻子力」，本常量**不再参与判定**，保留仅为向后兼容。
 DEAD_END_LEGAL_MOVES = 5
 
 # 进攻子力：无车 / 无马 / 无炮 / 无过河兵（`P-10` 实测结论）。
@@ -375,14 +379,14 @@ def _is_dead_end(rec: PlyRecord) -> bool:
     **`P-10` 实测依据**：两局残局信号验证里，闷摆最严重的两局**都不是**
     doctrine 没送达，而是局面本身没有进攻手段——
       - `endgame_m9_p085`：红方仅帅 + 一象，子力 0.0 对 8.0；
-      - `endgame_m14_p059`：红方帅 + 仕 + 两象，子力 6.0 对 12.0，
-        且红方唯一的「吃子」实为黑卒吃红象，方向相反。
+      - `endgame_m14_p059`：红方帅 + 仕 + 两象，子力 6.0 对 12.0。
     两局红方都**无车马炮、且无过河兵**，`endgame-technique` 的四条换法一条都用不上。
 
-    判据取「走子方无任何进攻子力」，比按着法数阈值更贴合成因；
-    着法数阈值（`DEAD_END_LEGAL_MOVES`）保留作辅助信号。
+    **判据只取「有无进攻子力」**：曾附带「合法着法数 < 5」作为辅助信号，
+    但实测该条在**误伤**——`eval-after-w03` 的 `middlegame_p41` 全程都有进攻
+    子力，却有 8 手因着法数偏少被豁免。故已移除，**只保留成因判据**。
     """
-    return (not rec.has_attack_piece) or (0 < rec.legal_moves_before < DEAD_END_LEGAL_MOVES)
+    return not rec.has_attack_piece
 
 
 def analyze_game(starting_fen: str,
