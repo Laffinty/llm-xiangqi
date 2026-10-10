@@ -47,16 +47,40 @@ htmlcov/
 logs/
 *.log
 
-# Environment variables
-.env
-.env.local
-
-# 密钥文件：绝不入库。tests/eval 的 --api-file 指向这类文件。
-# 误提交过一次就等于把 API key 公开，且 git 历史里删不掉。
+# 密钥文件：绝不入库。
+#
+# 误提交过一次就等于把 API key 公开，**且 git 历史里删不掉**——
+# 补救只能改写整个历史 + 通知所有克隆者，成本极高。因此这里宁可过度匹配。
+#
+# 覆盖范围：
+#   1. tests/eval 的 --api-file 指向的文本密钥文件（本项目用【provider】sk-xxx 格式）
+#   2. 常见命名变体（大小写、下划线/连字符、任意目录层级）
+#   3. 其它常见的本地密钥载体（env、pem/key、credentials）
 api.txt
 TEST_API.txt
 *_API.txt
+*_api.txt
 **/TEST_API.txt
+**/test_api.txt
+**/*API*.txt
+**/*api*key*.txt
+**/*key*.txt
+*.pem
+*.key
+**/credentials.json
+**/.credentials
+secrets.txt
+secrets/
+**/secrets/
+*.secret
+**/*.secret
+
+# Environment variables（覆盖全部 .env* 变体）
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 
 # OS
 .DS_Store
