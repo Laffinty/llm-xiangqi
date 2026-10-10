@@ -1,0 +1,623 @@
+{
+  "meta": {
+    "case_ids": [
+      "middlegame_attack_p4",
+      "middlegame_attack_p5",
+      "middlegame_attack_p2",
+      "middlegame_attack_p3",
+      "middlegame_attack_p1"
+    ],
+    "cases_file": "cases_attack.json",
+    "caveats": [
+      "本批无胜负局：胜负指标不可观测，不能据此比较棋力。可用指标为 token 成本 / 耗时 / 走步合法率 / text_only_ratio。",
+      "5 局被回合上限截断，属未完成对局，不计入和棋判断。",
+      "决策来源：红方兜底率 0.03、黑方兜底率 0.0594（0 = 全部走契约）。"
+    ],
+    "commit": "9f24299",
+    "dirty": true,
+    "matchups": [
+      "deepseek vs mimo"
+    ],
+    "max_turns": 40,
+    "models": {
+      "deepseek": "deepseek-flash",
+      "mimo": "mimo-v2.6-flash"
+    },
+    "note": "temperature=0 为评测设定，非仓库默认；use_tools 取自 config（当前 false）",
+    "seed": 42,
+    "temperature": 0.0,
+    "thinking": false
+  },
+  "raw": [
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_attack_p4",
+      "category": "middlegame",
+      "elapsed_sec": 431.24,
+      "move_history": [
+        "h2e2",
+        "b2e2",
+        "g0e2",
+        "i4f4",
+        "h0f1",
+        "f4f1",
+        "i0i1",
+        "f1f0",
+        "e0f0",
+        "f7f2",
+        "e1f2",
+        "i7g5",
+        "i1f1",
+        "a6a5",
+        "a2a5",
+        "c7a6",
+        "a5e5",
+        "e6e5",
+        "e2g4",
+        "e5e4",
+        "e3e4",
+        "e8d8",
+        "f1d1",
+        "d8e8",
+        "d1d8",
+        "e8d8",
+        "f0f1",
+        "i9i7",
+        "c2e3",
+        "i7f7",
+        "e3c4",
+        "f7f2",
+        "f1f2",
+        "g5e7",
+        "c4d6",
+        "c6c5",
+        "d6b7",
+        "d8e8",
+        "b7d6",
+        "e8d8"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 19,
+          "decisions": 20,
+          "fallback_rate": 0.05,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "2ba1a1nr/4k4/2n2c2b/p1p1p1p1p/P8/8r/2P1P1P1P/RcN4C1/4A4/2B1KABNR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 5353,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 40073,
+          "tool_call_turns": 0,
+          "total_tokens": 45426
+        },
+        "Red": {
+          "completion_tokens": 9874,
+          "content_only_turns": 1,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 21,
+          "prompt_tokens": 47285,
+          "tool_call_turns": 20,
+          "total_tokens": 57159
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_attack_p5",
+      "category": "middlegame",
+      "elapsed_sec": 295.62,
+      "move_history": [
+        "b7e7",
+        "e8e7",
+        "c8c9",
+        "e9e8",
+        "b0c2",
+        "b8b2",
+        "c2b0",
+        "b2e2",
+        "g1e1",
+        "e2e3",
+        "i0i2",
+        "e3e1",
+        "f0e1",
+        "d1d7",
+        "i2e2",
+        "d7d5",
+        "e2e5",
+        "e7e5",
+        "c9f9",
+        "e5e2",
+        "f9e9",
+        "e2e1",
+        "e9e1",
+        "d5d1",
+        "b0d1",
+        "i6i5",
+        "d1e3",
+        "g9e7",
+        "e3c4",
+        "e7g9",
+        "c4e5",
+        "e8f8",
+        "e5g6",
+        "i7g6",
+        "e1e5",
+        "g6e5",
+        "h0g2",
+        "e5g6",
+        "g3g4",
+        "g5g4"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 19,
+          "decisions": 20,
+          "fallback_rate": 0.05,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "3akab2/1rC1r4/1R2b3n/p1p5p/4p1p1P/9/P1P1P1P2/B3B3c/3c2C2/1N1AKA1NR w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 5448,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 41074,
+          "tool_call_turns": 0,
+          "total_tokens": 46522
+        },
+        "Red": {
+          "completion_tokens": 11242,
+          "content_only_turns": 1,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 21,
+          "prompt_tokens": 47866,
+          "tool_call_turns": 20,
+          "total_tokens": 59108
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_attack_p2",
+      "category": "middlegame",
+      "elapsed_sec": 486.13,
+      "move_history": [
+        "d2d9",
+        "c7d7",
+        "d1d7",
+        "d8d7",
+        "e6e9",
+        "h8e8",
+        "d9d8",
+        "e4e9",
+        "d8d9",
+        "e9e3",
+        "g2e3",
+        "e8e3",
+        "d9e9",
+        "e3e7",
+        "e9e8",
+        "e7e3",
+        "e8e9",
+        "e3e5",
+        "e9d9",
+        "e5e1",
+        "d0e1",
+        "a7b9",
+        "d9e9",
+        "c9e7",
+        "e9a9",
+        "b9c7",
+        "a9a7",
+        "c7d9",
+        "a7e7",
+        "d9e7",
+        "i0i2",
+        "e7g8",
+        "i2d2",
+        "d7e7",
+        "d2d7",
+        "e7d7",
+        "e0f0",
+        "g8e7",
+        "c0e2",
+        "e7d5"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 20,
+          "decisions": 21,
+          "fallback_rate": 0.0476,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0476,
+          "legal": 20,
+          "parse_failures": 1
+        },
+        "Red": {
+          "contract_hits": 19,
+          "decisions": 20,
+          "fallback_rate": 0.05,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "r1ba1abn1/3k3r1/n1c6/p1p1C1p1p/9/4c4/P1P1P1P1P/N2C2N2/3RA4/2BAK1B1R w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 6332,
+          "content_only_turns": 21,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 21,
+          "prompt_tokens": 42867,
+          "tool_call_turns": 0,
+          "total_tokens": 49199
+        },
+        "Red": {
+          "completion_tokens": 9964,
+          "content_only_turns": 1,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 21,
+          "prompt_tokens": 47722,
+          "tool_call_turns": 20,
+          "total_tokens": 57686
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_attack_p3",
+      "category": "middlegame",
+      "elapsed_sec": 616.44,
+      "move_history": [
+        "f5f7",
+        "g4g3",
+        "i2g3",
+        "g7g3",
+        "f7e7",
+        "g9e7",
+        "e2e6",
+        "f9e8",
+        "e6e8",
+        "e9e8",
+        "b8d8",
+        "e8d8",
+        "a2d2",
+        "d8e8",
+        "d2d7",
+        "e8f8",
+        "d7a7",
+        "c9a7",
+        "i4i5",
+        "i7h5",
+        "i5h5",
+        "g3f3",
+        "c4c5",
+        "f3f1",
+        "e1e0",
+        "a7c5",
+        "h5g5",
+        "g6g5",
+        "b0c2",
+        "f1f7",
+        "c2d4",
+        "f7f5",
+        "d4f5",
+        "c5a7",
+        "f5e7",
+        "a9e9",
+        "e7c8",
+        "e9e7",
+        "c8e7",
+        "g5g4"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 16,
+          "decisions": 20,
+          "fallback_rate": 0.2,
+          "fallbacks": 4,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "r1b1kab2/1C7/n4ac1n/p3p1p2/2p2R2p/2P3r1P/P3P1P2/R2cC3N/4K4/1NBA1AB2 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 12356,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 40108,
+          "tool_call_turns": 0,
+          "total_tokens": 52464
+        },
+        "Red": {
+          "completion_tokens": 10438,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 46234,
+          "tool_call_turns": 20,
+          "total_tokens": 56672
+        }
+      },
+      "turn_count": 40
+    },
+    {
+      "aborted": null,
+      "black": "mimo",
+      "case_id": "middlegame_attack_p1",
+      "category": "middlegame",
+      "elapsed_sec": 429.18,
+      "move_history": [
+        "c8c9",
+        "a9c9",
+        "h6g6",
+        "i6g6",
+        "i9f9",
+        "e9f9",
+        "b3b9",
+        "c9b9",
+        "g0e2",
+        "b9b1",
+        "e1e0",
+        "b1e1",
+        "d0e1",
+        "h7e7",
+        "e2c4",
+        "g6g3",
+        "c4e2",
+        "g3f3",
+        "g2f4",
+        "f3f4",
+        "e2g4",
+        "f4f0",
+        "e1f0",
+        "e7e3",
+        "c0a2",
+        "e3a3",
+        "g4e2",
+        "a3i3",
+        "e2g0",
+        "i3i0",
+        "e0d0",
+        "i0f0",
+        "d0e0",
+        "i5i4",
+        "e0e1",
+        "f0f8",
+        "e1f1",
+        "f8f2",
+        "f1f0",
+        "f2f8"
+      ],
+      "move_quality": {
+        "Black": {
+          "contract_hits": 19,
+          "decisions": 20,
+          "fallback_rate": 0.05,
+          "fallbacks": 1,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        },
+        "Red": {
+          "contract_hits": 20,
+          "decisions": 20,
+          "fallback_rate": 0.0,
+          "fallbacks": 0,
+          "illegal": 0,
+          "illegal_rate": 0.0,
+          "legal": 20,
+          "parse_failures": 0
+        }
+      },
+      "moves_played": 40,
+      "red": "deepseek",
+      "result": "draw",
+      "result_reason": "Maximum turns reached",
+      "starting_fen": "r1b1kab1C/2R6/n2a3c1/p3p1pRr/8p/2p6/PCP1P1P1P/6N2/4K4/2BA1AB2 w - - 0 1",
+      "stats": {
+        "Black": {
+          "completion_tokens": 7376,
+          "content_only_turns": 20,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 39928,
+          "tool_call_turns": 0,
+          "total_tokens": 47304
+        },
+        "Red": {
+          "completion_tokens": 8183,
+          "content_only_turns": 0,
+          "error_samples": [],
+          "errors": 0,
+          "llm_calls": 20,
+          "prompt_tokens": 43832,
+          "tool_call_turns": 20,
+          "total_tokens": 52015
+        }
+      },
+      "turn_count": 40
+    }
+  ],
+  "schema": "llm-xiangqi/eval-report@2",
+  "summary": {
+    "activation": {
+      "Black": {
+        "consistency": null,
+        "empty": null,
+        "empty_rate": null,
+        "matches": 0,
+        "measured": false,
+        "turns": 0
+      },
+      "Red": {
+        "consistency": null,
+        "empty": null,
+        "empty_rate": null,
+        "matches": 0,
+        "measured": false,
+        "turns": 0
+      }
+    },
+    "by_category": {
+      "middlegame": {
+        "aborted": 0,
+        "black_win": 0,
+        "draw_by_cap": 5,
+        "draw_natural": 0,
+        "games": 5,
+        "mean_ply": 40.0,
+        "red_win": 0
+      }
+    },
+    "decisive_games": 0,
+    "games": 5,
+    "mean_elapsed_sec": 451.72,
+    "mean_ply": 40.0,
+    "mean_tokens_per_turn": 2617.8,
+    "move_quality": {
+      "Black": {
+        "contract_hits": 95,
+        "decisions": 101,
+        "fallback_rate": 0.0594,
+        "fallbacks": 6,
+        "illegal": 0,
+        "illegal_rate": 0.0099,
+        "legal": 100,
+        "measured": true,
+        "parse_failures": 1
+      },
+      "Red": {
+        "contract_hits": 97,
+        "decisions": 100,
+        "fallback_rate": 0.03,
+        "fallbacks": 3,
+        "illegal": 0,
+        "illegal_rate": 0.0,
+        "legal": 100,
+        "measured": true,
+        "parse_failures": 0
+      }
+    },
+    "outcome": {
+      "aborted": 0,
+      "black_win": 0,
+      "draw_by_cap": 5,
+      "draw_natural": 0,
+      "red_win": 0,
+      "unknown": 0
+    },
+    "result_reasons": [
+      "Maximum turns reached"
+    ],
+    "sides": {
+      "Black": {
+        "completion_tokens": 36865,
+        "content_only_turns": 101,
+        "errors": 0,
+        "llm_calls": 101,
+        "prompt_tokens": 204050,
+        "text_only_ratio": 1.0
+      },
+      "Red": {
+        "completion_tokens": 49701,
+        "content_only_turns": 3,
+        "errors": 0,
+        "llm_calls": 103,
+        "prompt_tokens": 232939,
+        "text_only_ratio": 0.03
+      }
+    },
+    "warnings": [
+      "本批无胜负局：胜负指标不可观测，不能据此比较棋力。可用指标为 token 成本 / 耗时 / 走步合法率 / text_only_ratio。",
+      "5 局被回合上限截断，属未完成对局，不计入和棋判断。",
+      "决策来源：红方兜底率 0.03、黑方兜底率 0.0594（0 = 全部走契约）。"
+    ]
+  }
+}
