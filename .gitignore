@@ -51,6 +51,13 @@ logs/
 .env
 .env.local
 
+# 密钥文件：绝不入库。tests/eval 的 --api-file 指向这类文件。
+# 误提交过一次就等于把 API key 公开，且 git 历史里删不掉。
+api.txt
+TEST_API.txt
+*_API.txt
+**/TEST_API.txt
+
 # OS
 .DS_Store
 Thumbs.db
