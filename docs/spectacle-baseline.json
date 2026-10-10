@@ -1,0 +1,236 @@
+{
+  "errors": [],
+  "games": [
+    {
+      "case_id": "endgame_m14_p059",
+      "category": "endgame",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.1,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 12.0,
+          "move_repeat_rate": 0.0,
+          "plies": 10,
+          "quiet_streak_max": 3,
+          "sac_count": 0,
+          "tactic_rate": 0.4
+        },
+        "Red": {
+          "material_end": 2.0,
+          "move_repeat_rate": 0.2,
+          "plies": 10,
+          "quiet_streak_max": 6,
+          "sac_count": 0,
+          "tactic_rate": 0.1
+        }
+      },
+      "plies": 20,
+      "quiet_streak_max": 6,
+      "sac_count": 0,
+      "sac_sound_rate": null,
+      "style_drift_count": 6,
+      "tactic_rate": 0.25
+    },
+    {
+      "case_id": "opening_p13",
+      "category": "opening",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.1,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 21.0,
+          "move_repeat_rate": 0.2,
+          "plies": 20,
+          "quiet_streak_max": 4,
+          "sac_count": 3,
+          "tactic_rate": 0.3
+        },
+        "Red": {
+          "material_end": 23.0,
+          "move_repeat_rate": 0.0,
+          "plies": 20,
+          "quiet_streak_max": 6,
+          "sac_count": 5,
+          "tactic_rate": 0.35
+        }
+      },
+      "plies": 40,
+      "quiet_streak_max": 9,
+      "sac_count": 8,
+      "sac_sound_rate": 0.625,
+      "style_drift_count": 19,
+      "tactic_rate": 0.325
+    },
+    {
+      "case_id": "middlegame_p25",
+      "category": "middlegame",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.025,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 16.5,
+          "move_repeat_rate": 0.05,
+          "plies": 20,
+          "quiet_streak_max": 4,
+          "sac_count": 6,
+          "tactic_rate": 0.35
+        },
+        "Red": {
+          "material_end": 21.0,
+          "move_repeat_rate": 0.0,
+          "plies": 20,
+          "quiet_streak_max": 3,
+          "sac_count": 7,
+          "tactic_rate": 0.4
+        }
+      },
+      "plies": 40,
+      "quiet_streak_max": 4,
+      "sac_count": 13,
+      "sac_sound_rate": 0.7692307692307693,
+      "style_drift_count": 20,
+      "tactic_rate": 0.375
+    },
+    {
+      "case_id": "in_check_p111",
+      "category": "in_check",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.029411764705882353,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 15.0,
+          "move_repeat_rate": 0.0,
+          "plies": 17,
+          "quiet_streak_max": 5,
+          "sac_count": 3,
+          "tactic_rate": 0.35294117647058826
+        },
+        "Red": {
+          "material_end": 8.0,
+          "move_repeat_rate": 0.058823529411764705,
+          "plies": 17,
+          "quiet_streak_max": 4,
+          "sac_count": 4,
+          "tactic_rate": 0.4117647058823529
+        }
+      },
+      "plies": 34,
+      "quiet_streak_max": 6,
+      "sac_count": 7,
+      "sac_sound_rate": 0.8571428571428571,
+      "style_drift_count": 18,
+      "tactic_rate": 0.38235294117647056
+    },
+    {
+      "case_id": "opening_p05",
+      "category": "opening",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.075,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 16.5,
+          "move_repeat_rate": 0.05,
+          "plies": 20,
+          "quiet_streak_max": 7,
+          "sac_count": 3,
+          "tactic_rate": 0.25
+        },
+        "Red": {
+          "material_end": 36.5,
+          "move_repeat_rate": 0.1,
+          "plies": 20,
+          "quiet_streak_max": 6,
+          "sac_count": 5,
+          "tactic_rate": 0.4
+        }
+      },
+      "plies": 40,
+      "quiet_streak_max": 10,
+      "sac_count": 8,
+      "sac_sound_rate": 0.5,
+      "style_drift_count": 14,
+      "tactic_rate": 0.325
+    },
+    {
+      "case_id": "middlegame_p41",
+      "category": "middlegame",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.0,
+      "notes": [
+        "sac_count=8 但 sac_sound_rate=0.38：弃子多于得子，疑似为观赏而弃"
+      ],
+      "per_color": {
+        "Black": {
+          "material_end": 12.0,
+          "move_repeat_rate": 0.0,
+          "plies": 20,
+          "quiet_streak_max": 2,
+          "sac_count": 3,
+          "tactic_rate": 0.5
+        },
+        "Red": {
+          "material_end": 6.0,
+          "move_repeat_rate": 0.0,
+          "plies": 20,
+          "quiet_streak_max": 4,
+          "sac_count": 5,
+          "tactic_rate": 0.45
+        }
+      },
+      "plies": 40,
+      "quiet_streak_max": 5,
+      "sac_count": 8,
+      "sac_sound_rate": 0.375,
+      "style_drift_count": 19,
+      "tactic_rate": 0.475
+    },
+    {
+      "case_id": "endgame_m9_p085",
+      "category": "endgame",
+      "long_chase_turns": 0,
+      "move_repeat_rate": 0.05,
+      "notes": [],
+      "per_color": {
+        "Black": {
+          "material_end": 6.0,
+          "move_repeat_rate": 0.0,
+          "plies": 10,
+          "quiet_streak_max": 4,
+          "sac_count": 0,
+          "tactic_rate": 0.2
+        },
+        "Red": {
+          "material_end": 2.0,
+          "move_repeat_rate": 0.1,
+          "plies": 10,
+          "quiet_streak_max": 7,
+          "sac_count": 0,
+          "tactic_rate": 0.1
+        }
+      },
+      "plies": 20,
+      "quiet_streak_max": 9,
+      "sac_count": 0,
+      "sac_sound_rate": null,
+      "style_drift_count": 5,
+      "tactic_rate": 0.15
+    }
+  ],
+  "schema": "llm-xiangqi/spectacle@1",
+  "summary": {
+    "games": 7,
+    "mean_move_repeat_rate": 0.0542016806722689,
+    "mean_quiet_streak_max": 7.0,
+    "mean_sac_sound_rate": 0.6252747252747253,
+    "mean_style_drift_count": 14.428571428571429,
+    "mean_tactic_rate": 0.32605042016806723,
+    "replay_errors": 0,
+    "total_long_chase_turns": 0,
+    "total_sac_count": 44
+  }
+}
