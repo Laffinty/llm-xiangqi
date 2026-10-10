@@ -59,6 +59,12 @@ SAC_LOOKAHEAD_PLIES = 4
 # 依据：实测 6 份报告的最长连续段为 10/20/19/20/23/25，取 6 留出余量。
 CHURN_MIN_RUN = 6
 
+# 进攻子力：无车 / 无马 / 无炮 / 无过河兵（`P-10` 实测结论）。
+# 这四类全无时，「进兵提速 / 主动兑子 / 制造接触」等换法**结构性不适用**——
+# 不是模型不执行，是无子可进、无子可兑、无子可接触。
+# 定义在此处而非 `_is_dead_end` 附近：`replay_plies` 在运行时就要读它。
+NO_ATTACK_PIECES = ("rook", "knight", "cannon")
+
 
 @dataclass(frozen=True)
 class PlyRecord:
@@ -77,6 +83,7 @@ class PlyRecord:
     material_after: Dict[str, float]  # 走完这步后双方的子力价值
     board_key: str                   # 局面棋盘部分（FEN 第一段），用于重复判定
     legal_moves_before: int = 0      # 走这步**之前**，走子方的合法着法数（死局判据）
+    has_attack_piece: bool = True  # 走这步前，走子方是否仍有进攻子力（车/马/炮/过河兵）
 
     @property
     def is_tactic(self) -> bool:
@@ -181,6 +188,21 @@ def replay_plies(starting_fen: str, moves: Sequence[str]) -> List[PlyRecord]:
         sacrifice_piece_type = engine._detect_sacrifice(
             move, moved_piece, None)
 
+        # 走子方此刻是否还握有进攻子力（车/马/炮，或已过河的本方兵卒）。
+        # 「进兵提速 / 兑子 / 制造接触」等换法都以此为前提（`P-10`）。
+        has_attack = False
+        for _r in range(10):
+            for _c in range(9):
+                _p = engine.board.grid[_r][_c]
+                if _p is None or _p.color != moved_piece.color:
+                    continue
+                if _p.piece_type.value in NO_ATTACK_PIECES:
+                    has_attack = True
+                elif _p.piece_type == PieceType.PAWN:
+                    crossed = (_r >= 5) if _p.color == Color.RED else (_r <= 4)
+                    if crossed:
+                        has_attack = True
+
         if not engine.validate_move(iccs):
             raise SpectacleReplayError("第 %d 手 %s：引擎判定为非法走步" % (i, iccs))
 
@@ -219,6 +241,7 @@ def replay_plies(starting_fen: str, moves: Sequence[str]) -> List[PlyRecord]:
             material_after=_material_value(engine),
             board_key=_board_key(fen_after),
             legal_moves_before=legal_before,
+            has_attack_piece=has_attack,
         ))
 
     return records
@@ -340,10 +363,26 @@ def _long_chase_turns(records: Sequence[PlyRecord]) -> int:
 # 依据实测：正常残局仍有 5-9 个着法可选，而死局局面低至 1-4 个。
 DEAD_END_LEGAL_MOVES = 5
 
+# 进攻子力：无车 / 无马 / 无炮 / 无过河兵（`P-10` 实测结论）。
+# 缺少这四类中的全部时，「进兵提速 / 主动兑子 / 制造接触」等换法**结构性不适用**——
+# 不是模型不执行，是无子可进、无子可兑、无子可接触。
+NO_ATTACK_PIECES = ("rook", "knight", "cannon")
+
 
 def _is_dead_end(rec: PlyRecord) -> bool:
-    """该手是否发生在「可选着法极少」的死局中。"""
-    return 0 < rec.legal_moves_before < DEAD_END_LEGAL_MOVES
+    """该手是否发生在「无可进攻子力」的局面中。
+
+    **`P-10` 实测依据**：两局残局信号验证里，闷摆最严重的两局**都不是**
+    doctrine 没送达，而是局面本身没有进攻手段——
+      - `endgame_m9_p085`：红方仅帅 + 一象，子力 0.0 对 8.0；
+      - `endgame_m14_p059`：红方帅 + 仕 + 两象，子力 6.0 对 12.0，
+        且红方唯一的「吃子」实为黑卒吃红象，方向相反。
+    两局红方都**无车马炮、且无过河兵**，`endgame-technique` 的四条换法一条都用不上。
+
+    判据取「走子方无任何进攻子力」，比按着法数阈值更贴合成因；
+    着法数阈值（`DEAD_END_LEGAL_MOVES`）保留作辅助信号。
+    """
+    return (not rec.has_attack_piece) or (0 < rec.legal_moves_before < DEAD_END_LEGAL_MOVES)
 
 
 def analyze_game(starting_fen: str,

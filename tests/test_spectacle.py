@@ -213,35 +213,53 @@ class TestMetricSemantics:
 
 
 class TestDeadEndExemption:
-    """`P-09` 守卫：死局里的闷摆**不可归因于 doctrine**。
+    """`P-09`/`P-10` 守卫：无进攻子力时的闷摆**不可归因于 doctrine**。
 
-    实测 `endgame_m9_p085`：红方第 11 手起只剩 3 子、合法着法 4 个——
-    无兵可进、无子可兑、唯一能动的是那个象。此时「无吃无将」是**局面决定的**，
-    不是 SKILL 没起作用。把它计入闷摆，等于因为局面本身无解而惩罚 doctrine。
+    **实测依据**（残局 2 局信号验证 `eval-after-p07-endgame.json`）：
+      - `endgame_m9_p085`：红方仅帅 + 一象，子力 0.0 对 8.0；
+      - `endgame_m14_p059`：红方帅 + 仕 + 两象，子力 6.0 对 12.0，
+        且唯一那个「吃子」实为黑卒吃红象，方向相反。
+    两局红方**无车马炮、且无过河兵**，`endgame-technique` 的四条换法
+    （进兵提速 / 主动兑子 / 制造接触 / 残局禁弃子）**一条都用不上**。
     """
 
-    def test_dead_end_helpers_exist(self):
-        from tests.eval.spectacle import DEAD_END_LEGAL_MOVES, _is_dead_end
+    def test_dead_end_criteria_exist(self):
+        from tests.eval.spectacle import DEAD_END_LEGAL_MOVES, NO_ATTACK_PIECES
         assert DEAD_END_LEGAL_MOVES >= 2, "阈值过低会把正常残局误判为死局"
+        assert set(NO_ATTACK_PIECES) == {"rook", "knight", "cannon"}, \
+            "进攻子力应含车/马/炮"
 
-    def test_dead_end_flag_on_real_position(self):
-        """用实测报告里的死局局面验证标记正确。"""
+    def test_openings_have_attack_pieces(self):
+        """开局双方都应判定为「有进攻子力」——否则豁免会误伤正常对局。"""
+        from tests.eval.spectacle import _is_dead_end
+        fen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
+        # 引擎实测合法的开局走法（`e2e4` 非法——中卒已被吃/不能那样走）
+        moves = ["h2e2", "h7h6", "b0c2"]
+        engine = RefereeEngine(fen)
+        for m in moves:
+            assert engine.validate_move(m), "夹具走法 %s 非法" % m
+            engine.apply_move(m)
+        recs = replay_plies(fen, moves)
+        for r in recs:
+            assert r.has_attack_piece, "开局第 %d 手应判定有进攻子力" % (r.index + 1)
+            assert not _is_dead_end(r), "开局不应被判死局"
+
+    def test_no_attack_position_is_exempted(self):
+        """实测报告里「无进攻子力」的手应被豁免，且开局手不被豁免。"""
         import json
         from pathlib import Path
+        from tests.eval.spectacle import _is_dead_end
         base = Path(__file__).resolve().parents[1] / "docs" / "eval-after-p07-endgame.json"
         if not base.exists():
             pytest.skip("实测报告不存在")
         doc = json.loads(base.read_text(encoding="utf-8"))
         game = next(g for g in doc["raw"] if g["case_id"] == "endgame_m9_p085")
         recs = replay_plies(game["starting_fen"], game["move_history"])
-        from tests.eval.spectacle import _is_dead_end
-        dead = [r for r in recs if _is_dead_end(r)]
+        assert any(not r.has_attack_piece for r in recs), "该局应存在无进攻子力的手"
+        assert any(r.has_attack_piece for r in recs), "开局阶段应有进攻子力"
+        exempt = [r for r in recs if _is_dead_end(r)]
         alive = [r for r in recs if not _is_dead_end(r)]
-        assert dead, "该局应有死局手"
-        assert alive, "该局也应有无着法限制的手（开局阶段）"
-        # 死局手的合法着法数必须确实更少
-        assert (max(r.legal_moves_before for r in dead)
-                < max(r.legal_moves_before for r in alive))
+        assert exempt and alive, "豁免与未豁免的手应同时存在（否则判据失效）"
 
     def test_churn_excludes_dead_end_turns(self):
         """死局段里的无吃无将手不应计入闷摆。"""
@@ -256,7 +274,6 @@ class TestDeadEndExemption:
         recs = replay_plies(game["starting_fen"], game["move_history"])
 
         got = _long_chase_turns(recs)
-        # 按定义手工复算，但**排除死局手**
         run = 0; expect = 0
         for r in recs:
             if r.is_tactic:
