@@ -76,6 +76,7 @@ class PlyRecord:
     under_threat: bool               # 走完之后己方该子是否可被对方直接吃掉
     material_after: Dict[str, float]  # 走完这步后双方的子力价值
     board_key: str                   # 局面棋盘部分（FEN 第一段），用于重复判定
+    legal_moves_before: int = 0      # 走这步**之前**，走子方的合法着法数（死局判据）
 
     @property
     def is_tactic(self) -> bool:
@@ -155,6 +156,9 @@ def replay_plies(starting_fen: str, moves: Sequence[str]) -> List[PlyRecord]:
         mover_color = engine.get_current_turn()
         in_check_before = engine.is_king_in_check(
             Color.RED if mover_color == "Red" else Color.BLACK)
+        # 走子方此刻的可选着法数：用于判定「死局」——
+        # 着法极少时无内容可走是**局面决定的**，不能归因于 doctrine（`P-09`）。
+        legal_before = len(engine.get_legal_moves())
 
         move = None
         try:
@@ -214,6 +218,7 @@ def replay_plies(starting_fen: str, moves: Sequence[str]) -> List[PlyRecord]:
             under_threat=under_threat,
             material_after=_material_value(engine),
             board_key=_board_key(fen_after),
+            legal_moves_before=legal_before,
         ))
 
     return records
@@ -322,9 +327,23 @@ def _long_chase_turns(records: Sequence[PlyRecord]) -> int:
             run = 0
             continue
         run += 1
-        if run >= CHURN_MIN_RUN:
+        # 死局豁免（`P-09`）：走子方可选着法极少时，「没内容可走」是**局面
+        # 决定的**，不是 doctrine 没起作用。实测 `endgame_m9_p085` 到第 11 手时
+        # 红方只剩 3 子、合法着法 4 个——此时任何走法都只能调度同一个象。
+        # 把它计入闷摆，等于因为**局面本身无解**而惩罚 doctrine。
+        if run >= CHURN_MIN_RUN and not _is_dead_end(r):
             total += 1
     return total
+
+
+# 走子方合法着法数低于此值即视为「死局」，闷摆不可归因于 doctrine（`P-09`）。
+# 依据实测：正常残局仍有 5-9 个着法可选，而死局局面低至 1-4 个。
+DEAD_END_LEGAL_MOVES = 5
+
+
+def _is_dead_end(rec: PlyRecord) -> bool:
+    """该手是否发生在「可选着法极少」的死局中。"""
+    return 0 < rec.legal_moves_before < DEAD_END_LEGAL_MOVES
 
 
 def analyze_game(starting_fen: str,

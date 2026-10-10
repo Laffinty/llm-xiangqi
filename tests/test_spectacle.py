@@ -212,6 +212,72 @@ class TestMetricSemantics:
             "吃子打断了累积：吃子后仅 5 手搬运，未达阈值 6")
 
 
+class TestDeadEndExemption:
+    """`P-09` 守卫：死局里的闷摆**不可归因于 doctrine**。
+
+    实测 `endgame_m9_p085`：红方第 11 手起只剩 3 子、合法着法 4 个——
+    无兵可进、无子可兑、唯一能动的是那个象。此时「无吃无将」是**局面决定的**，
+    不是 SKILL 没起作用。把它计入闷摆，等于因为局面本身无解而惩罚 doctrine。
+    """
+
+    def test_dead_end_helpers_exist(self):
+        from tests.eval.spectacle import DEAD_END_LEGAL_MOVES, _is_dead_end
+        assert DEAD_END_LEGAL_MOVES >= 2, "阈值过低会把正常残局误判为死局"
+
+    def test_dead_end_flag_on_real_position(self):
+        """用实测报告里的死局局面验证标记正确。"""
+        import json
+        from pathlib import Path
+        base = Path(__file__).resolve().parents[1] / "docs" / "eval-after-p07-endgame.json"
+        if not base.exists():
+            pytest.skip("实测报告不存在")
+        doc = json.loads(base.read_text(encoding="utf-8"))
+        game = next(g for g in doc["raw"] if g["case_id"] == "endgame_m9_p085")
+        recs = replay_plies(game["starting_fen"], game["move_history"])
+        from tests.eval.spectacle import _is_dead_end
+        dead = [r for r in recs if _is_dead_end(r)]
+        alive = [r for r in recs if not _is_dead_end(r)]
+        assert dead, "该局应有死局手"
+        assert alive, "该局也应有无着法限制的手（开局阶段）"
+        # 死局手的合法着法数必须确实更少
+        assert (max(r.legal_moves_before for r in dead)
+                < max(r.legal_moves_before for r in alive))
+
+    def test_churn_excludes_dead_end_turns(self):
+        """死局段里的无吃无将手不应计入闷摆。"""
+        import json
+        from pathlib import Path
+        from tests.eval.spectacle import CHURN_MIN_RUN, _long_chase_turns, _is_dead_end
+        base = Path(__file__).resolve().parents[1] / "docs" / "eval-after-p07-endgame.json"
+        if not base.exists():
+            pytest.skip("实测报告不存在")
+        doc = json.loads(base.read_text(encoding="utf-8"))
+        game = next(g for g in doc["raw"] if g["case_id"] == "endgame_m9_p085")
+        recs = replay_plies(game["starting_fen"], game["move_history"])
+
+        got = _long_chase_turns(recs)
+        # 按定义手工复算，但**排除死局手**
+        run = 0; expect = 0
+        for r in recs:
+            if r.is_tactic:
+                run = 0
+                continue
+            run += 1
+            if run >= CHURN_MIN_RUN and not _is_dead_end(r):
+                expect += 1
+        assert got == expect
+        # 与「不豁免」的旧算法对比，确认豁免确实改变了结果
+        run = 0; no_exempt = 0
+        for r in recs:
+            if r.is_tactic:
+                run = 0
+                continue
+            run += 1
+            if run >= CHURN_MIN_RUN:
+                no_exempt += 1
+        assert got < no_exempt, "死局豁免未生效"
+
+
 class TestCompareGates:
     def test_missing_metric_is_indeterminate_not_pass(self):
         """基线缺 sac_sound_rate（None）时必须判「无法判定」，不能判通过。"""
