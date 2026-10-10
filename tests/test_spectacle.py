@@ -376,50 +376,79 @@ class TestCompareGates:
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": None, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
         }}
         cur = {"summary": {
             "mean_tactic_rate": 0.4, "mean_move_repeat_rate": 0.05,
             "mean_sac_sound_rate": 0.8, "mean_quiet_streak_max": 4.0,
-            "total_long_chase_turns": 0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
         }}
         rows, ok = compare(base, cur)
         assert ok is False
         sac_row = [r for r in rows if r[0] == "弃子成立率"][0]
         assert sac_row[1] == "无法判定"
 
-    def test_tactic_rate_over_cap_is_regression(self):
-        """tactic_rate 超过 0.45 上限判「退化」（互将军噪音，不判改善）。
+    def test_check_rate_over_cap_is_regression(self):
+        """`check_rate` 超过上限判「退化」——频繁将军才是噪音。
 
-        上限来自实测分布（PLAN-SPECTACLE-001 §3.4）：6 份历史报告实测
-        落在 0.308~0.336。**0.55 是初稿拍脑袋值，实测下永远不会触发**，
-        等于没有守卫——此断言同时守住「阈值必须由数据支撑」这条纪律。
+        `P-14` 修正：原判据是「`tactic_rate > 0.45` 判互将军噪音」，
+        但实测证明该假设错误——`eval-attack-baseline` 5 局**将军全为 0**，
+        密度高全来自吃大子（车 16、炮 16，总价值 295）。
+        因此噪音判读**只对将军成立**，吃子密度不再被误判。
         """
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
         }}
         cur = {"summary": {
-            "mean_tactic_rate": 0.70, "mean_move_repeat_rate": 0.1,
+            "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.30,
         }}
         rows, ok = compare(base, cur)
-        cap_row = [r for r in rows if r[0] == "战术密度上限"][0]
-        assert cap_row[1] == "退化"
+        row = [r for r in rows if r[0] == "将军密度上限"][0]
+        assert row[1] == "退化", "将军密度超限应判退化"
         assert ok is False
 
-    def test_cap_is_not_so_high_it_never_triggers(self):
-        """反向守卫：上限必须落在实测分布之上、且有余量。
+    def test_high_capture_rate_is_not_flagged_as_noise(self):
+        """吃子密度高**不得**被判为噪音——这是 `P-14` 的核心修正。
 
-        实测最高 0.336（§3.4）。若有人把上限调到 0.34~0.45 以外的高位，
-        要么永不触发（等于没守卫），要么把正常改善误判为过火。
-        此断言把上限钉在 [0.36, 0.50] 区间内。
+        实测 `middlegame_attack_p4` 的 `tactic_rate=0.667` 全部来自吃子
+        （3 手里吃 2 子），此前被误报成「互将军噪音」。
         """
-        from tests.eval.spectacle import OVERRIDES
-        cap = [o[2] for o in OVERRIDES if o[0] == "summary.mean_tactic_rate"][0]
-        assert 0.36 <= cap <= 0.50, "上限 %.2f 超出实测支撑区间" % cap
+        base = {"summary": {
+            "mean_tactic_rate": 0.30, "mean_move_repeat_rate": 0.1,
+            "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+        }}
+        # 吃子密度升到 0.60，但将军仍为 0 —— 应判通过
+        cur = {"summary": {
+            "mean_tactic_rate": 0.60, "mean_move_repeat_rate": 0.05,
+            "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 4.0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
+        }}
+        rows, ok = compare(base, cur)
+        assert ok is True, [r for r in rows if r[1] != "通过"]
+        names = [r[0] for r in rows]
+        assert "将军密度上限" in names
+        # 且不应再有以「战术密度」命名的上限判读项
+        assert not any("战术密度上限" == n for n in names), \
+            "战术密度不再承担噪音判读"
+
+    def test_cap_thresholds_are_evidence_based(self):
+        """上限必须有实测支撑，不能拍脑袋。
+
+        `check_rate` 上限：全部历史报告实测均为 **0.00**（LLM 基本不将军），
+        取 0.12 是给它留出「偶尔将军」的空间——真正的噪音是**持续互将**。
+        """
+        from tests.eval.spectacle import CHECK_RATE_CAP, TACTIC_RATE_CAP, OVERRIDES
+        assert 0.05 <= CHECK_RATE_CAP <= 0.20, \
+            "将军密度上限 %.2f 偏离实测（全为 0.00）" % CHECK_RATE_CAP
+        assert TACTIC_RATE_CAP >= 0.60, \
+            "战术密度兜底不应低于实测最高值附近（吃大子可达 0.667）"
+        paths = [o[0] for o in OVERRIDES]
+        assert "summary.mean_check_rate" in paths, "噪音判读必须挂在将军密度上"
 
     def test_measured_worse_than_baseline_flags_regression(self):
         """用实测到的退化方向验证门禁真的会红。
@@ -431,11 +460,13 @@ class TestCompareGates:
             "mean_tactic_rate": 0.326, "mean_move_repeat_rate": 0.054,
             "mean_sac_sound_rate": 0.625, "mean_quiet_streak_max": 7.0,
             "total_long_chase_turns": 17,      # P-06 重写后的实测值
+            "mean_check_rate": 0.0,            # P-14 新增字段
         }}
         worse = {"summary": {
             "mean_tactic_rate": 0.379, "mean_move_repeat_rate": 0.093,
             "mean_sac_sound_rate": 0.527, "mean_quiet_streak_max": 9.7,
             "total_long_chase_turns": 40,      # P-05 实测：闷摆回合 17 -> 40
+            "mean_check_rate": 0.0,
         }}
         rows, ok = compare(base, worse)
         assert ok is False
@@ -448,12 +479,12 @@ class TestCompareGates:
         base = {"summary": {
             "mean_tactic_rate": 0.3, "mean_move_repeat_rate": 0.1,
             "mean_sac_sound_rate": 0.6, "mean_quiet_streak_max": 6.0,
-            "total_long_chase_turns": 4,
+            "total_long_chase_turns": 4, "mean_check_rate": 0.0,
         }}
         cur = {"summary": {
             "mean_tactic_rate": 0.35, "mean_move_repeat_rate": 0.05,
             "mean_sac_sound_rate": 0.7, "mean_quiet_streak_max": 5.0,
-            "total_long_chase_turns": 0,
+            "total_long_chase_turns": 0, "mean_check_rate": 0.0,
         }}
         rows, ok = compare(base, cur)
         assert ok is True, rows

@@ -99,6 +99,8 @@ class GameSpectacle:
     category: str
     plies: int = 0
     tactic_rate: float = 0.0
+    capture_rate: float = 0.0        # 吃子占比（`P-14`：与 check 分开看）
+    check_rate: float = 0.0         # 将军占比（`P-14`：只有它才可能是噪音）
     quiet_streak_max: int = 0
     move_repeat_rate: float = 0.0
     sac_count: int = 0
@@ -114,6 +116,8 @@ class GameSpectacle:
             "category": self.category,
             "plies": self.plies,
             "tactic_rate": self.tactic_rate,
+            "capture_rate": self.capture_rate,
+            "check_rate": self.check_rate,
             "quiet_streak_max": self.quiet_streak_max,
             "move_repeat_rate": self.move_repeat_rate,
             "sac_count": self.sac_count,
@@ -403,6 +407,8 @@ def analyze_game(starting_fen: str,
 
     tactics = sum(1 for r in records if r.is_tactic)
     result.tactic_rate = tactics / len(records)
+    result.capture_rate = sum(1 for r in records if r.captured_piece) / len(records)
+    result.check_rate = sum(1 for r in records if r.gives_check) / len(records)
     result.quiet_streak_max = _quiet_streak_max(records)
     result.move_repeat_rate = _move_repeat_rate(records)
     result.sac_count = sum(1 for r in records if _is_sacrifice_candidate(r))
@@ -444,10 +450,14 @@ def analyze_game(starting_fen: str,
             "第 %s 手起出现闷摆（连续无吃无将 ≥%d 手），全程累计 %d 手"
             % (first if first is not None else "?", CHURN_MIN_RUN,
                result.long_chase_turns))
-    if result.tactic_rate > 0.45:
+    if result.check_rate > CHECK_RATE_CAP:
         result.notes.append(
-            "tactic_rate=%.3f 超过 0.45：疑似互将军形成噪音，非「更精彩」"
-            % result.tactic_rate)
+            "check_rate=%.3f 超过 %.2f：频繁将军互相消磨，是真实的观感噪音"
+            % (result.check_rate, CHECK_RATE_CAP))
+    if result.tactic_rate > TACTIC_RATE_CAP:
+        result.notes.append(
+            "tactic_rate=%.3f 超过 %.2f：战术密度异常高，建议检查吃子构成"
+            % (result.tactic_rate, TACTIC_RATE_CAP))
     if result.sac_sound_rate is not None and result.sac_sound_rate < 0.5:
         result.notes.append(
             "sac_count=%d 但 sac_sound_rate=%.2f：弃子多于得子，疑似为观赏而弃"
@@ -495,6 +505,8 @@ def analyze_report(raw_games: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "mean_sac_sound_rate": sound,
             "mean_style_drift_count": _mean([float(g.style_drift_count) for g in games]),
             "total_long_chase_turns": sum(g.long_chase_turns for g in games),
+            "mean_capture_rate": _mean([g.capture_rate for g in games]),
+            "mean_check_rate": _mean([g.check_rate for g in games]),
         },
         "errors": errors,
     }
@@ -520,13 +532,26 @@ SPECTACLE_GATES: List[Tuple[str, str, str]] = [
     ("summary.total_long_chase_turns", "闷摆回合", "down"),
 ]
 
-# §3.3 第 2 条：tactic_rate 不是越高越好，超过上限判「过火」。
-# 上限 0.45 来自实测分布（§3.4）：6 份历史报告落在 0.308~0.336，
-# 该值距实测最高点留 +34% 余量，足以容纳真实改善，同时远低于 0.55
-# ——后者在全部实测数据上永远不会触发，等于没有守卫。
+# §3.3 第 2 条：tactic_rate 不是越高越好。
+#
+# **`P-14` 修正**：原判据写的是「超过 0.45 判为互将军噪音」，但实测证明
+# **这个假设是错的**——`eval-attack-baseline` 5 局里**将军数为 0**，
+# 战术密度高（最高 0.667）完全来自**吃子**；而被吃的全是**大子**
+# （车 16、马 6、炮 16，总价值 295），属真实战斗，不是噪音。
+#
+# 因此上限**只对「将军」设**，因为只有互将军才是真噪音；
+# 吃子多高都可能是好棋（车炮连环吃本来就是观赏性来源）。
+CHECK_RATE_CAP = 0.12   # 实测：全部历史报告的 check_rate 均为 0.00
+TACTIC_RATE_CAP = 0.65  # 仅作兜底（防止密度失控），不承担「噪音」判读
+
+# 上限门禁：`P-14` 前曾用 `mean_tactic_rate > 0.45` 判「互将军噪音」，
+# 实测证明该假设错误（5 局将军全为 0，密度高全来自吃大子）。
+# 现改为**只对将军设上限**，吃子不再被误判。
 OVERRIDES: List[Tuple[str, str, float, str]] = [
-    ("summary.mean_tactic_rate", "战术密度上限", 0.45,
-     "超过上限判为互将军噪音，不判为改善"),
+    ("summary.mean_check_rate", "将军密度上限", CHECK_RATE_CAP,
+     "频繁将军互相消磨才是噪音；吃子多属正常战斗"),
+    ("summary.mean_tactic_rate", "战术密度兜底", TACTIC_RATE_CAP,
+     "仅防止密度失控，不用于判断观感好坏"),
 ]
 
 
@@ -592,6 +617,8 @@ def _print_summary(doc: Dict[str, Any]) -> None:
     print("")
     print("---- 汇总 ----")
     print("mean_tactic_rate        %s" % s["mean_tactic_rate"])
+    print("  其中 吃子            %s" % s["mean_capture_rate"])
+    print("  其中 将军            %s" % s["mean_check_rate"])
     print("mean_quiet_streak_max   %s" % s["mean_quiet_streak_max"])
     print("mean_move_repeat_rate   %s" % s["mean_move_repeat_rate"])
     print("total_sac_count         %s" % s["total_sac_count"])
