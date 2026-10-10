@@ -92,6 +92,72 @@ class TestNoDuplicateRuleBlocks:
             "移走条款后必须留下指引，否则信息真的丢了"
 
 
+class TestGameNarrativeActivation:
+    """`game-narrative` 只在开局激活——这是预算约束下的刻意选择，需守住。"""
+
+    def test_only_activates_in_opening(self):
+        from src.skills import router
+        from src.skills.registry import load_skills
+        reg = load_skills()
+        for phase in ("opening", "middlegame", "endgame"):
+            active = [s.name for s in router.resolve(
+                reg, {"board_phase": phase, "in_check": False,
+                      "repetition_warning": False})]
+            if phase == "opening":
+                assert "game-narrative" in active
+            else:
+                assert "game-narrative" not in active, (
+                    "%s 不该激活 game-narrative：常驻会给每个组合加约 460 字符"
+                    % phase)
+
+    def test_base_prompt_does_not_dangle_reference(self):
+        """`base.md` 不得引用未激活时就不存在的 skill 名。
+
+        回归：`game-narrative` 曾从常驻改为仅开局激活，而 base.md 仍指向它——
+        中局/残局的 prompt 里就出现了指向不存在章节的指引。
+        """
+        from pathlib import Path
+        from src.skills.activator import compose
+        base = Path("prompts/base.md").read_text(encoding="utf-8")
+        for phase in ("middlegame", "endgame"):
+            text, active = compose(
+                {"board_phase": phase, "in_check": False,
+                 "repetition_warning": False}, player_color="Red")
+            body = text.split("## 可用知识（按局面自动选择）", 1)[-1]
+            for ref in ("game-narrative",):
+                assert ref not in base or ref in active, (
+                    "base.md 引用 %s，但 %s 阶段不激活它" % (ref, phase))
+            assert "tempo-drama" not in body and "sac-culture" not in body, (
+                "正文引用了已合并删除的 skill")
+
+
+class TestMiddlegameContent:
+    """合并后的中局 skill 必须同时保住「节奏」与「弃子」两块内容。
+
+    合并是为省预算，但**不能丢 doctrine**——本测试守住这一点：
+    合并时最容易发生的静默事故，是「以为另一份会覆盖」而实际删掉了内容。
+    """
+
+    @pytest.mark.parametrize("keyword,why", [
+        ("闷摆", "实测头号观赏性杀手"),
+        ("战术密度", "节奏判据必须可量化，否则退化为玄学"),
+        ("0.30~0.34", "实测分布区间，给模型可参照的目标带"),
+        ("弃子", "观赏性的主要来源"),
+        ("须成立", "弃子三判据之一——防无脑送子"),
+        ("须有选择", "弃子三判据之一——被迫弃子不算"),
+    ])
+    def test_contains(self, keyword, why):
+        assert keyword in body("middlegame-tactics"), \
+            "合并后丢失了「%s」——%s" % (keyword, why)
+
+    def test_keeps_both_references(self):
+        import os
+        refs = os.listdir(os.path.join(
+            str(SKILLS / "middlegame-tactics"), "references"))
+        assert "move-values.md" in refs
+        assert "sac-motifs.md" in refs, "弃子图式 references 应随合并一并保留"
+
+
 class TestSpectacleMetricsRemainReachable:
     """`S-03` 的另一半：新写的条文必须真的对应 §3.1 的指标。
 
