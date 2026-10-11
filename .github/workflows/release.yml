@@ -71,7 +71,8 @@ jobs:
 
           # 取最新的 v*.*.* tag。--sort=-v:refname 按版本号降序（不是字典序）
           LAST="$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1 || true)"
-          echo "最新 tag: ${LAST:-（无）}" >> "$GITHUB_OUTPUT"
+          # $GITHUB_OUTPUT 只能写 key=value 行；普通日志直接 echo 到 stdout（runner 解析到非法行会 fail 整个步骤）
+          echo "最新 tag: ${LAST:-（无）}"
 
           if [ -z "$LAST" ]; then
             VERSION="0.1.0"
@@ -84,7 +85,7 @@ jobs:
             PATCH=$((PATCH + 1))
             VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
-          echo "递增后版本: v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "递增后版本: v${VERSION}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "manual=false" >> "$GITHUB_OUTPUT"
 
