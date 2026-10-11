@@ -43,6 +43,19 @@ class LLMConfig:
             raise ValueError(f"timeout must be a positive integer, got {self.timeout}")
 
 
+# 四种棋风的规范描述（`PLAN-SPECTACLE-001` `P-04`）。
+#
+# 放在 config 层而不是 skill 层，是为了让**红黑各自不同**：若写在 skill 正文里，
+# 两个 agent 会读到同一段文字，反而可能选到同一种棋风（`T-03` 的根因）。
+# 这里是唯一事实来源，base.md 只保留 `{PLAY_STYLE}` 占位符。
+PLAY_STYLES = {
+    "aggressive": "进攻型：激烈搏杀，善用弃子攻杀，敢于冒险，主动制造接触。",
+    "solid": "稳健型：注重子力协调，稳步推进，积小胜为大胜，不轻易弃子。",
+    "flexible": "灵活型：随机应变，善出奇招，不拘泥于固定套路。",
+    "counter": "防守反击型：先稳固阵型，诱敌深入，再伺机反扑。",
+}
+
+
 @dataclass
 class AgentConfigDTO:
     """Agent配置数据传输对象"""
@@ -56,6 +69,8 @@ class AgentConfigDTO:
     retry_delay: int = 2
     use_tools: bool = True
     use_reflection: bool = False
+    # 棋风（`P-04`）。None 表示「由模型自选」，保持旧行为不变。
+    play_style: Optional[str] = None
     
     def __post_init__(self):
         """验证配置值的有效性"""
@@ -69,6 +84,10 @@ class AgentConfigDTO:
             raise ValueError(f"max_retries must be a non-negative integer, got {self.max_retries}")
         if not isinstance(self.retry_delay, int) or self.retry_delay < 0:
             raise ValueError(f"retry_delay must be a non-negative integer, got {self.retry_delay}")
+        if self.play_style is not None and self.play_style not in PLAY_STYLES:
+            raise ValueError(
+                "play_style 必须是 %s 之一（或留空表示由模型自选），got: %r"
+                % (sorted(PLAY_STYLES), self.play_style))
 
 
 @dataclass
@@ -245,6 +264,7 @@ class ConfigLoader:
             retry_delay=agent_data.get("retry_delay", 2),
             use_tools=agent_data.get("use_tools", True),
             use_reflection=agent_data.get("use_reflection", False),
+            play_style=agent_data.get("play_style"),  # `P-04`：None = 模型自选
         )
 
     @classmethod

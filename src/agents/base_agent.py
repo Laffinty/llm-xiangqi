@@ -77,6 +77,9 @@ class AgentConfig:
     # W-05：启用后 system prompt 由 base.md + skill manifest + 激活正文组装，
     # 而不是 agent_default.txt 全量常驻。默认关：未迁移时保持旧行为。
     use_skills: bool = False
+    # P-04：棋风（aggressive/solid/flexible/counter）。None = 由模型自选。
+    # 红黑配不同棋风是「双方不同质」的关键，见 `T-03`。
+    play_style: Optional[str] = None
 
 
 @dataclass
@@ -96,7 +99,8 @@ class BaseAgent(ABC):
     def __init__(self, config: AgentConfig):
         self.config = config
         self.prompt_builder = PromptBuilder(config.system_prompt,
-                                           use_skills=getattr(config, "use_skills", False))
+                                           use_skills=getattr(config, "use_skills", False),
+                                           play_style=getattr(config, "play_style", None))
         self.status = AgentStatus.IDLE
         self.last_response: Optional[LLMResponse] = None
         # 本回合的合法走步：续生成时仍需它构造决策契约的 enum

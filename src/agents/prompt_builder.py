@@ -62,7 +62,8 @@ class PromptBuilder:
     )
 
     def __init__(self, system_prompt: Optional[str] = None,
-                 use_skills: bool = False):
+                 use_skills: bool = False,
+                 play_style: Optional[str] = None):
         """
         初始化PromptBuilder
 
@@ -84,6 +85,8 @@ class PromptBuilder:
         self.system_prompt = system_prompt
         # W-05：启用后 system prompt 由 base.md + manifest + 激活正文组装
         self.use_skills = use_skills
+        # `P-04`：棋风由 config 指定；None = 模型自选（保持旧行为）
+        self.play_style = play_style
         # 本回合激活的 skill 名，供 harness 断言用
         self.active_skills: List[str] = []
         self.history: List[Dict[str, str]] = []
@@ -166,7 +169,8 @@ class PromptBuilder:
         if self.use_skills:
             from ..skills.activator import compose
             composed, self.active_skills = compose(
-                snapshot=game_state.get("snapshot"), player_color=player_color)
+                snapshot=game_state.get("snapshot"), player_color=player_color,
+                play_style=self.play_style)
             system_prompt = composed
             self.system_prompt = composed
 

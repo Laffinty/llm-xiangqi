@@ -14,6 +14,8 @@ agent:
   # W-05：启用后 system prompt 由 base.md + skill manifest + 按局面激活的正文组装，
   # 替代 agent_default.txt 的全量常驻。任何一个局面组合都比原常驻省 token（最多 -41%）。
   skills: true
+  # P-04 棋风硬绑定：黑方防守反击型，与红方进攻型形成对照。
+  play_style: "counter"
 
 llm:
   provider: "mimo"

@@ -94,6 +94,8 @@ def _load_agent(config_file: str) -> LLMAgent:
         use_reflection=agent_data.get("use_reflection", False),
         use_decision_contract=bool(agent_data.get("decision_contract", False)),
         use_skills=bool(agent_data.get("skills", False)),
+        # P-04：棋风由 config 指定；缺省为 None（模型自选，保持旧行为）
+        play_style=agent_data.get("play_style"),
     )
 
     return LLMAgent(agent_cfg)

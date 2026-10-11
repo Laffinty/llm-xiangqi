@@ -14,6 +14,9 @@ agent:
   # W-05：启用后 system prompt 由 base.md + skill manifest + 按局面激活的正文组装，
   # 替代 agent_default.txt 的全量常驻。任何一个局面组合都比原常驻省 token（最多 -41%）。
   skills: true
+  # P-04 棋风硬绑定：红方进攻型，黑方见 agent2_config.yaml 的防守反击型。
+  # 两边不同质是「观感有张力」的前提——同一种棋风会让双方各走各的。
+  play_style: "aggressive"
 
 llm:
   provider: "deepseek"

@@ -469,25 +469,69 @@ python -m pytest tests/test_spectacle.py -q
 **顺带修正 `E-02`**：棋风段由「自然展现…不要僵化执行」改为「**锁定其中一种，整局不换**」，
 把软文变成可执行指令（仍不指定具体是哪一种，见 `P-04`）。
 
-### P-04 棋风从「软文」改为「硬绑定」—— `挂起`（依赖 P-02、P-03）
+### P-04 棋风从「软文」改为「硬绑定」 —— `完成`（2026-10-11）
 
-**产出**：`base.md` 的棋风段改为由 config 注入；`agent1_config.yaml` 设为进攻型，
-`agent2_config.yaml` 设为稳健型。
+**原挂起理由**：需改 `src/`（config 注入）。本次解冻并完成。
 
-**挂起理由**：`base.md` 是**所有局面**的公共前缀，改它会让 prompt 前缀变化
-→ **prompt 缓存全失效**（`activator.py` 的模块 docstring 已明确这条纪律）。
-而棋风注入需要改 `activator.compose()` 或 `config_loader`，**属于改 `src/`**，
-超出本轮非目标。
+#### 核心决策：棋风定义放**config 层**，不放 skill 层
 
-**`P-03` 与 `P-02` 的部分进展**：棋风段由「自然展现…不要僵化执行」改为
-「**锁定一种，整局不换**」，且四型定义已直接写入 `base.md` 常驻段
-（`P-02` 期间 `game-narrative` 从常驻改为仅开局激活，故定义必须常驻才能被中局读到）。
+若把四型棋风写在 `game-narrative` 的正文里让模型自选，**两个 agent 会读到同一段文字**，
+仍可能选到同一种取向——那正是 `T-03` 的根因。因此：
 
-**剩下的仍挂起**：由 config 指定红黑**各自用哪一种**并注入。这需要改
-`activator.compose()` 或 `config_loader`，属改 `src/`，超出本轮非目标。
+- **`config/*.yaml`** 显式指定 `play_style`，由部署方决定红黑各是什么
+- **`prompts/base.md`** 只保留 `{PLAY_STYLE}` 占位符
+- **`skills/activator.py`** 在组装后注入具体棋风文本
 
-**实测注意**：当前 `agent1_config.yaml` 与 `agent2_config.yaml` **都没有棋风字段**，
-两个 agent 拿到完全相同的常驻段 → **双方同质化**（§7 盲区 1）。这是 `P-04` 待解决的核心。
+这样红黑**必然**拿到不同棋风，不依赖模型"选得不一样"。
+
+#### 改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `src/utils/config_loader.py` | 新增 `PLAY_STYLES` 常量表 + `AgentConfigDTO.play_style` 字段与校验 |
+| `src/agents/base_agent.py` | `AgentConfig.play_style` 字段；传入 `PromptBuilder` |
+| `src/agents/prompt_builder.py` | `play_style` 参数透传给 `compose()` |
+| `src/skills/activator.py` | `compose(..., play_style)` + `_style_text()` + `_STYLE_FALLBACK` |
+| `prompts/base.md` | 棋风段改为 `**你的棋风：{PLAY_STYLE}**` |
+| `config/agent1_config.yaml` | 红方 `play_style: "aggressive"` |
+| `config/agent2_config.yaml` | 黑方 `play_style: "counter"` |
+
+#### 一个刻意的架构取舍
+
+`activator._style_text` **不从 `config_loader.PLAY_STYLES` 取值**，而是自带一份映射。
+原因：activator 属于 skills 层，反向依赖 utils.config_loader 会形成**层间循环**。
+代价是两处可能漂移——因此新增 `TestStyleTableConsistency` 用
+`inspect.getsource` 抽出两边 key 与文案做**逐项比对**，任一处改动不同步即转红。
+
+#### 向后兼容
+
+未配置 `play_style` 时回退到「自选一种并锁定」——**保持旧行为**，不硬塞一种棋风。
+`compose()` 的前两个参数不变，eval harness 里大量两参调用照常工作
+（`TestBackwardCompatibility` 守卫）。
+
+#### 守卫测试（10 项，含负向验证）
+
+| 测试 | 守卫什么 |
+|---|---|
+| `test_no_placeholder_leaks_for_any_style` | 占位符在任何棋风下都不泄漏到最终 prompt |
+| `test_unknown_style_falls_back` | 未知 key 静默降级，不透出占位符 |
+| `test_styles_differ_in_prompt` | 红黑棋风文本不同 |
+| `test_real_configs_are_configured_differently` | **仓库两份配置真的配了不同棋风** |
+| `test_config_values_are_valid_keys` | 配置值合法 |
+| `test_same_key_set` / `test_same_text_per_key` | 两处映射表防漂移 |
+| `test_compose_signature_backward_compatible` | 两参调用仍可用 |
+
+**负向验证**：把 `agent2_config.yaml` 改成 `aggressive`（与红方相同），
+`test_real_configs_are_configured_differently` 立即转红；恢复后全绿。
+
+这条守卫比单元测试更关键——**配置写错时单元测试照样通过**，但部署后
+`T-03` 就重现了。
+
+#### 连带关闭
+
+- **`T-03`（双方同质化）→ `已消解`**（见 §5）
+- **§7 盲区 1**：`style_drift_count` 测不出同质化 —— 该盲区的**根因**已消除，
+  即便指标本身仍测不出，至少**成因**被堵住了
 
 **建议**：等 P-02 的收益已实测，再单独立项做，并在 §8 记录本次挂起。
 
@@ -609,17 +653,18 @@ python -m pytest tests/test_spectacle.py -q
 **缓解**：强制 `E-08` 第 2 条「弃子须成立」，并在 `sac_sound_rate` 上设反向守卫。
 若 `sac_count` 上升而 `sac_sound_rate` 下降 → **判为失败**，不得判为「观赏性提升」。
 
-### T-03 双方同时激进导致对局更难看 —— `开放`
+### T-03 双方同时激进导致对局更难看 —— `已消解`（2026-10-11，`P-04` 修复）
 
-若 `S-04` 未落实（棋风未硬绑定，见 P-04 挂起），`game-narrative` 只是软文，
-**两个 agent 会同化为同一种激进**。
+原风险：若棋风未硬绑定，`game-narrative` 只是软文，**两个 agent 会同化为同一种取向**。
 
-**缓解**：§3.1 的 `style_drift_count` 只能测「个体是否摇摆」，**测不了「双方是否同质」**。
-这是一个**已知的指标盲区**，已记入 §7 盲区 1。
+**修复**：棋风改由 `config/*.yaml` 显式指定（红 `aggressive` / 黑 `counter`），
+`base.md` 只保留 `{PLAY_STYLE}` 占位符，由 `activator.compose()` 在组装后注入。
+**红黑必然拿到不同棋风，不依赖模型「选得不一样」。**
 
-**当前状态：仍然开放。** 人工试看（2026-10-11）观察到双方棋风确实分开，
-但那是**单次观察**，不构成消解。根因是 `P-04` 挂起：
-`base.md` 对两个 agent 是同一段文字，双方仍可能选到同一种棋风。
+守卫 `test_real_configs_are_configured_differently` 会在两份配置被抄成同一种时转红。
+
+> 注：`style_drift_count` 仍测不出「双方是否同质」——但**成因已被堵住**，
+> 不再是「已知且会发生的盲区」，而是「指标覆盖不到，但不会发生的问题」。
 
 ### T-04 「可回放」依赖 `move_history` 完整 —— `已消解`
 
@@ -689,9 +734,9 @@ python -m pytest tests/test_spectacle.py -q
 
 ## §7 已知盲区（如实记录）
 
-1. **`style_drift_count` 测不了双方同质化。** 双方都用同一段 `base.md` 棋风时，
-   各自都不「漂移」，指标为 0，但一盘棋仍然无趣。真正的解法是 `P-04`（硬绑定不同棋风），
-   而 `P-04` 当前挂起。**在 P-04 落地前，`game-narrative` 的实际收益无法被现有指标完整捕捉。**
+1. ~~**`style_drift_count` 测不了双方同质化**~~ —— **成因已消除**（`P-04`，2026-10-11）。
+   棋风改由 config 显式指定（红 `aggressive` / 黑 `counter`），**红黑必然不同质**，
+   不再依赖模型自选。该指标仍测不出「是否同质」，但那已不是会发生的问题。
 2. **无引擎评估。** 本轮全程不调 Pikafish，因此 `sac_sound_rate` 只能用
    「N 步内有无丢子」这个**粗糙代理**近似，不是真正的引擎认可。真正的「须成立」需引擎复核。
 3. **无人类观感评分。** 全部指标是代理指标，**不等于「好看」**。最终仍需业主本人看几局观感。
@@ -1371,7 +1416,7 @@ python -m tests.eval.run --cases-file tests/eval/cases_attack.json \
 | `P-01` 指标重放器 | 完成 |
 | `P-02` 观赏性 doctrine | 完成（形态调整：新增 1 个 + 合并 2 个，预算 2714→3200） |
 | `P-03` 长打/闷局知识 | 完成（诊断修正为「闷摆」，发现 `T-05`） |
-| `P-04` 棋风硬绑定 | **`挂起`**（需改 `src/`；不做则 §7 盲区 1 长期存在） |
+| `P-04` 棋风硬绑定 | **完成**（红 `aggressive` / 黑 `counter`，config 层指定；连带关闭 `T-03` 与盲区 1） |
 | `P-05` 端到端 A/B | 完成，**门禁未通过**（4/5 退化），根因已定位 |
 | `P-06` 重写 `long_chase_turns` | 完成（旧定义在基线判 0，等于没测出） |
 | `P-07` 残局闷摆条文 | 完成（含求和规则修正） |
@@ -1388,7 +1433,7 @@ python -m tests.eval.run --cases-file tests/eval/cases_attack.json \
 | — Web 人工试看 | **完成一次**（业主反馈：「有所进步，但不多」）。**不再追加** |
 | — 密钥泄露防护 | 完成（`.gitignore` + 常驻内容扫描测试） |
 
-**整体：19 个工作项，18 完成、1 挂起（`P-04`）。**
+**整体：19 个工作项，全部完成**（`P-04` 于 2026-10-11 解冻并完成）。
 
 **最终判定**：观赏性 doctrine **无法量化验证**（`P-17` 信噪比不足），
 唯一实际证据是人工试看反馈「**有所进步，但不多**」。
@@ -1433,7 +1478,7 @@ python -m tests.eval.run --cases-file tests/eval/cases_attack.json \
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| **`P-04` 棋风硬绑定** | `挂起` | 需改 `src/`（config 注入红黑不同棋风）。不做则 `T-03` 与§7 盲区 1 长期存在 |
+| ~~**`P-04` 棋风硬绑定**~~ | **已完成**（2026-10-11）：config 层指定，红 `aggressive` / 黑 `counter` |
 | `game.py` 支持中局起始 | 未做 | 当前 Web 只能看完整对局，**无法与量化指标对齐** |
 | 观感性 doctrine 的实际收益 | **未知** | 量化不可测（`P-17`）；人工试看结论为「有所进步，但不多」。**不再追加实验** |
 
@@ -1441,4 +1486,4 @@ python -m tests.eval.run --cases-file tests/eval/cases_attack.json \
 
 - **不再追加观感性 A/B** —— 信噪比不足（噪声 SD 为效应2 倍以上），继续投API 额度属沉没成本。
 - **不做人工观感评估** —— 业主 2026-10-11 裁定。
-- **不改 `src/` 的 prompt 组装** —— `P-04` 保持挂起。
+- ~~**不改 `src/` 的 prompt 组装**~~ —— **已做**：仅 `P-04` 解冻，改动限于 config 字段与占位符注入，未改 prompt 组装结构。
