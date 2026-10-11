@@ -18,7 +18,9 @@ if [ "$#" -lt 2 ]; then
     exit 2
 fi
 
-OUT_DIR="$1"
+# 输出目录必须在 cd 到仓库根之前绝对化（相对路径按调用者的 cwd 解析），
+# 否则打包子壳里 ARCHIVE 会相对临时暂存目录解析，产物写错位置甚至创建失败
+OUT_DIR="$(mkdir -p "$1" && cd "$1" && pwd)" || { echo "错误：无法创建输出目录 $1" >&2; exit 2; }
 VERSION="$2"
 STAGE_NAME="llm-xiangqi-${VERSION}"
 ARCHIVE="${OUT_DIR}/${STAGE_NAME}.zip"
