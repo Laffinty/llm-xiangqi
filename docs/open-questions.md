@@ -1,9 +1,15 @@
 # 待解问题 / Open Questions
 
-本项目当前**唯一的待解决清单**。已执行完成的计划、裁决与证据归档在
-`docs/history/skill-mode-design.md`（标着「不再执行」）。
+本项目当前**唯一的待解决清单**。已执行完成的计划、裁决与证据归档在：
+- `docs/history/skill-mode-design.md`（标着「不再执行」）
+- `docs/plan/entertainment-quality-plan.md`（`PLAN-SPECTACLE-001` 观赏性改造，19 项已收口）
+- `docs/plan/closeout-plan.md`（`PLAN-CLOSEOUT-001` 开放项收口，四项待裁决已裁决）
 
 **新事实、新裁决、新风险记到本文档。**
+
+> **当前状态（2026-11-11）**：7 个 RK 均有明确结论或降级依据，
+> **无「挂着不知道」的条目**。唯一待投入的工程项是 RK-04 的契约转换
+> （需改 `src/`，待单独裁决）。
 
 ---
 
